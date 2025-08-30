@@ -15,7 +15,7 @@ Lead Researchers
 # Project Partners
 
 - Stirling Reuse Hub (SRH) - Providing operational insights and real-world testing environment
-- Adventurous Systems (AS) - Technical development and prototype hosting expertise (Adventurous Systems)[https://adventurous.systems]
+- [Adventurous Systems](https://adventurous.systems) (AS) - Digital marketplace, Technical smart contract development and prototype hosting expertise
 - BE-ST - Stakeholder engagement and industry connections
 - Zero Waste Scotland - Policy guidance and dissemination support
 
