@@ -19,7 +19,7 @@
         <mxCell id="sXpS0CMYRoAF7_LuiiD5-5" value="Stakeholder Survey&amp;nbsp;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
           <mxGeometry x="380" y="130" width="60" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-8" value="Value Ecosystem&lt;div&gt;Mapping&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+        <mxCell id="sXpS0CMYRoAF7_LuiiD5-8" value="Value Ecosystem&lt;div&gt;Mapping&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="420" y="540" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="sXpS0CMYRoAF7_LuiiD5-9" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="sXpS0CMYRoAF7_LuiiD5-6">
@@ -56,7 +56,7 @@
             <mxPoint x="560" y="620" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-16" value="Material Flow&lt;div&gt;through Lifecycle&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+        <mxCell id="sXpS0CMYRoAF7_LuiiD5-16" value="Material Flow&lt;div&gt;through Lifecycle&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="570" y="585" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="sXpS0CMYRoAF7_LuiiD5-17" value="Architectural Design &amp;amp; Building Engineering existing knowledge" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
@@ -89,7 +89,7 @@
             <mxPoint x="960" y="570" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-24" value="Circular Economy Marketplace&lt;div&gt;for Materials&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxCell id="sXpS0CMYRoAF7_LuiiD5-24" value="Circular Economy Marketplace&lt;div&gt;for Materials&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="900" y="540" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="sXpS0CMYRoAF7_LuiiD5-25" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="sXpS0CMYRoAF7_LuiiD5-26" target="sXpS0CMYRoAF7_LuiiD5-24">
@@ -118,21 +118,6 @@
         </mxCell>
         <mxCell id="sXpS0CMYRoAF7_LuiiD5-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="sXpS0CMYRoAF7_LuiiD5-3" target="sXpS0CMYRoAF7_LuiiD5-3">
           <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-30" value="Qualitative towards Value ecosystem mapping" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="500" y="40" width="60" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-31" value="Quantitative &amp;amp; procedural" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="510" y="150" width="60" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-32" value="Stakeholder and value flows" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="510" y="230" width="60" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-33" value="Specification writing" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="510" y="290" width="60" height="30" as="geometry" />
-        </mxCell>
-        <mxCell id="sXpS0CMYRoAF7_LuiiD5-34" value="Prototyping" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="590" y="260" width="60" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
