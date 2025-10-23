@@ -287,18 +287,71 @@ The TRACE marketplace operates as a **commons-based peer production system** whe
 
 ## Working with This Repository
 
+### Development Phases
+
+#### MVP1: Traceability System (Current Focus)
+Focus on frictionless material tracking at Stirling Reuse Hub:
+- **Registry Smart Contract**: Verified hub and stakeholder registration
+- **Digital Product Passport (DPP)**: ERC-721 NFT for each material/component
+- **Key Features**:
+  - QR code integration for physical-digital linkage
+  - IoT sensor data integration for automated condition updates
+  - Simple ownership transfer mechanism
+  - IPFS metadata storage for technical specifications
+
+#### MVP2: Full Digital Marketplace (Future)
+Comprehensive token-based marketplace ecosystem:
+- **Stakeholder Mapping**: Identify all participants (hubs, builders, salvagers, certifiers)
+- **Activity Flow Analysis**: Map interactions and value exchanges
+- **Common Pool Resource Modeling**: Apply Ostrom's framework to shared material resources
+- **Value Pocket Identification**: Locate capture points for economic sustainability
+- **Token Engineering Simulation**: Use cadCAD/TokenSim to model:
+  - Token supply/demand dynamics
+  - Governance participation rates
+  - Market liquidity and fee structures
+  - Attack vector resilience
+- **Full Implementation**: Deploy dual-token system with governance
+
 ### Typical Tasks
+
+#### Documentation
 - Update research documentation
 - Maintain methodology diagrams
 - Add links to relevant token engineering resources
 - Document stakeholder engagement findings
 - Update project partners or team information
 
+#### MVP1 Development (Priority)
+- Implement `Registry.sol` for hub/stakeholder verification
+- Implement `MaterialPassport.sol` (ERC-721) for digital product passports
+- Build Python backend for QR code generation and scanning
+- Integrate IoT data feeds from Stirling Reuse Hub
+- Create IPFS pinning service for material metadata
+- Develop simple web interface for material registration
+
+#### MVP2 Preparation
+- Conduct stakeholder interviews and mapping exercises
+- Model common pool resource dynamics
+- Run cadCAD simulations for token economics
+- Design governance mechanisms based on participant feedback
+- Prototype dual-token contracts (TRC, RUS)
+
+#### Testing & Deployment
+- Write comprehensive Hardhat/Foundry tests
+- Deploy to Polygon Mumbai or Arbitrum Goerli testnet
+- Conduct pilot program at Stirling Reuse Hub
+- Gather user feedback and iterate
+
 ### Important Notes
-- Always maintain the research-focused nature of this repository
+- **Start Simple**: MVP1 focuses on traceability, not full marketplace
+- MVP1 requires only 2 core contracts: Registry + Material Passport
+- Token economics (TRC/RUS) are MVP2 features - design now, implement later
+- Always test on Layer 2 testnets before considering mainnet
+- Security audits required before handling real-value transactions
 - When adding technical resources, ensure they align with the project's focus on blockchain, IoT, and circular economy
 - Draw.io diagrams should be edited with the Draw.io application or compatible tools
-- Any future code development should focus on marketplace prototyping, material tracking, or stakeholder connection systems
+- Use OpenZeppelin libraries for all standard token implementations
+- Document all design decisions with references to token engineering research
 
 ## Git Workflow
 
