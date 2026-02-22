@@ -1,363 +1,331 @@
-# CLAUDE.md
+# CLAUDE.md — TRACE Project Context
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What is this project?
 
-## Project Overview
+TRACE is a blockchain-enabled digital marketplace for construction material reuse hubs. It issues EU DPP-compliant material passports, anchors integrity proofs on VeChainThor, and governs the system through Ostrom commons principles via smart contracts.
 
-TRACE (Transforming Resources and Advancing Circular Economy) is a research project developing a prototype digital marketplace for construction material reuse hubs in Scotland. The project addresses Scotland's 98.7% circularity gap by creating a trustworthy, real-time tracking system connecting stakeholders across the construction material reuse ecosystem.
+**Read `SPEC.md` for the full specification.** This file covers conventions and quick-reference only.
 
-**Key Technologies**: Blockchain, IoT, material passports, QR codes
+---
 
-**Research Team**:
-- Dr Michele Victoria - Lecturer, Robert Gordon University, Aberdeen
-- Dr Theodoros Dounas - Associate Professor, Heriot Watt University, Edinburgh
+## Quick Start
 
-**Project Partners**: Stirling Reuse Hub (SRH), Adventurous Systems, BE-ST, Zero Waste Scotland
+```bash
+# Prerequisites: Node 20+, pnpm 9+, Docker
 
-## Repository Structure
+# Start infrastructure
+docker compose up -d    # Thor Solo (8669), PostgreSQL (5432), Redis (6379), MinIO (9000), Meilisearch (7700)
 
-This repository is primarily a **research documentation repository** rather than a software project. It contains:
+# Install dependencies
+pnpm install
 
-- `README.md` - Project overview, research team, and partner information
-- `methods/` - Research methodology documentation and diagrams
-  - `methods.md` - Links to token engineering tools and frameworks
-  - `TRACE_methods_diagram.drawio` - Methodology diagram (Draw.io format)
+# Run DB migrations
+pnpm --filter @trace/db migrate
 
-## Development Context
+# Seed reference data (material categories, test hub, test users)
+pnpm --filter @trace/db seed
 
-### Current State
-- This is a **documentation-focused repository** transitioning to include smart contract development
-- **Blockchain**: Ethereum Virtual Machine (EVM) compatible, targeting Layer 2 solutions (Polygon, Arbitrum, or Optimism)
-- **Smart Contracts**: Solidity for on-chain logic
-- **User Space & Frontend**: Python for backend services and user interfaces
-- **Architecture**: Dual-token system with digital material passports (NFTs)
+# Start API dev server
+pnpm --filter @trace/api dev     # http://localhost:3001
 
-### Research Focus Areas
-The project addresses:
-1. Limited availability of reuse hubs across Scotland
-2. Lack of timely, trustworthy information for incorporating reused materials into construction projects
+# Start web dev server
+pnpm --filter @trace/web dev     # http://localhost:3000
 
-### Token Engineering Resources
-The project references several token engineering frameworks and tools (see `methods/methods.md`):
-- TokenLab, TokenSim, Simcraft
-- cadCAD ecosystem (radCAD, cadCADStudyGroup)
-- Machinations
-- QTM Interface
+# Deploy contracts to Thor Solo
+pnpm --filter @trace/contracts deploy:solo
 
-### Research on Token Design
-Research on TRACE has multiple complex targets to develop a full marketplace.
-- Two phases: MVP1 focusing on traceability and MVP2 focusing on the full market
-- MVP1:traceability develops the mechanics of tracing materials in the Stirling reuse hub. This has its own specs and engineering focusing on a frictionaless experience. Initially it develops a registry and a digital product passport(i.e two smart contracts)
-- MVP2:digital market requires the mapping of stakeholders, activiies between the stakerholders, mapping of the common pool resources system, and value pockets within the market. This then will be modelled in a token engineering system like CADCAM to ascertain viability of the market. 
-
-## Smart Contract Architecture
-
-### Overview
-TRACE implements a blockchain-based circular economy marketplace using a dual-token system with digital material passports. The architecture enables trustless material tracking, stakeholder governance, and economic incentives for sustainable construction practices.
-
-### Core Components
-
-#### 1. Material Passport NFT System
-**Contract**: `MaterialPassport.sol` (ERC-721 compliant)
-
-Digital passports are non-fungible tokens representing unique construction materials or components. Each passport contains:
-
-- **Material Identity**: Type, origin, manufacturer, batch number
-- **Physical Properties**: Dimensions, weight, material composition, structural ratings
-- **Lifecycle Data**: Manufacturing date, installation history, maintenance records, carbon footprint
-- **Chain of Custody**: Complete ownership and location history
-- **Verification Status**: IoT sensor data, QR code linkage, third-party certifications
-- **Condition Assessment**: Current state, remaining lifespan, reuse potential
-- **Metadata URI**: IPFS link to detailed documentation, images, technical specifications
-
-**Key Functions**:
-- `mintPassport()`: Create new material passport (restricted to verified reuse hubs)
-- `updateCondition()`: Update material status via IoT integration or inspector verification
-- `transferPassport()`: Transfer ownership through marketplace or direct sale
-- `retirePassport()`: Mark material as end-of-life (non-reversible)
-- `verifyAuthenticity()`: Validate passport against physical QR code
-
-#### 2. Dual-Token Economic Model
-
-##### a) TRACE Governance Token (TRC)
-**Contract**: `TRACEGovernance.sol` (ERC-20 compliant)
-
-- **Purpose**: Democratic governance of the TRACE ecosystem
-- **Distribution**:
-  - 40% - Active participants (reuse hubs, builders, salvagers) via staking and participation
-  - 25% - Research consortium and development team (vested over 4 years)
-  - 20% - Community treasury for ecosystem development
-  - 15% - Early supporters and project partners
-- **Governance Rights**:
-  - Propose and vote on protocol upgrades
-  - Set marketplace fee structures
-  - Approve new reuse hub registrations
-  - Adjust reward emission rates
-  - Allocate treasury funds for grants and sustainability initiatives
-- **Voting Power**: 1 token = 1 vote, with time-weighted multipliers for long-term holders
-- **Proposal Threshold**: 1% of total supply to create proposals
-- **Quorum**: 10% of circulating supply must participate for valid votes
-
-##### b) REUSE Reward Token (RUS)
-**Contract**: `REUSERewards.sol` (ERC-20 compliant)
-
-- **Purpose**: Economic incentives for circular economy participation
-- **Earning Mechanisms**:
-  - Listing materials on marketplace (supply-side incentive)
-  - Purchasing reused materials vs. virgin materials (demand-side incentive)
-  - Verifying material conditions (quality assurance)
-  - Achieving carbon footprint reduction milestones
-  - Successful material reuse cycles (longevity bonus)
-- **Utility**:
-  - Reduced marketplace transaction fees
-  - Priority access to high-demand materials
-  - Convertible to TRC governance tokens (bonding curve)
-  - Redeemable for services (certification, transport, assessment)
-- **Emission Schedule**: Decreasing rewards over 10 years to encourage early adoption
-- **Max Supply**: 1 billion RUS tokens
-
-#### 3. Marketplace Contract
-**Contract**: `TRACEMarketplace.sol`
-
-Central hub for material trading with integrated passport verification.
-
-**Features**:
-- **Listing Creation**: Sellers create listings tied to Material Passport NFTs
-- **Price Discovery**: Dutch auctions, fixed-price sales, or offer-based negotiations
-- **Escrow System**: Automated smart contract escrow for secure transactions
-- **Fee Structure**: 2.5% platform fee (0.5% to treasury, 2% distributed to TRC stakers)
-- **Quality Guarantees**: Dispute resolution mechanism with arbitration
-- **Search & Filter**: Off-chain indexing with on-chain verification
-- **RUS Rewards**: Automatic distribution upon successful transactions
-
-**Key Functions**:
-- `createListing()`: List material with passport verification
-- `purchaseMaterial()`: Buy material with automatic passport transfer
-- `makeOffer()`: Submit offer below asking price
-- `cancelListing()`: Remove listing and return passport to seller
-- `reportDispute()`: Initiate quality dispute resolution
-
-#### 4. Governance Contract
-**Contract**: `TRACEGovernor.sol` (OpenZeppelin Governor framework)
-
-Democratic decision-making for the TRACE ecosystem.
-
-**Proposal Types**:
-1. **Protocol Upgrades**: Changes to smart contract logic
-2. **Parameter Adjustments**: Fee rates, reward emissions, thresholds
-3. **Hub Registration**: Approve new reuse hubs as verified participants
-4. **Treasury Allocation**: Grant funding for research, hub expansion, sustainability programs
-5. **Emergency Actions**: Circuit breakers, pause mechanisms
-
-**Governance Process**:
-1. **Proposal Submission** (3-day discussion period)
-2. **Voting Period** (7 days)
-3. **Timelock** (2-day delay before execution)
-4. **Execution** (automatic via smart contract)
-
-**Security Features**:
-- Multi-signature override for critical emergencies (6 of 9 research consortium + partners)
-- Quadratic voting option to prevent whale dominance
-- Delegation system for passive token holders
-
-#### 5. Staking Contract
-**Contract**: `TRACEStaking.sol`
-
-Incentivizes long-term participation and governance engagement.
-
-**Staking Benefits**:
-- Earn portion of marketplace fees (2% of transaction volume)
-- Increased governance voting power (up to 2x multiplier for 1-year stakes)
-- Exclusive access to RUS → TRC conversion bonding curve
-- Priority dispute arbitration rights
-
-**Staking Tiers**:
-- Bronze: 1,000+ TRC (3-month lock)
-- Silver: 10,000+ TRC (6-month lock)
-- Gold: 50,000+ TRC (12-month lock)
-
-#### 6. Oracle Integration
-**Contract**: `TRACEOracle.sol`
-
-Bridges off-chain data with on-chain smart contracts.
-
-**Data Feeds**:
-- IoT sensor data from material storage facilities
-- Virgin material pricing for carbon footprint comparisons
-- Carbon credit valuations
-- Third-party certification verification
-- Weather/environmental data affecting material conditions
-
-**Providers**: Chainlink, Band Protocol, or custom oracle network
-
-### Contract Interaction Flow
-
-```
-User Actions → Frontend (Python) → Web3 Provider → Layer 2 Network
-                                                          ↓
-Material Passport NFT ←→ TRACE Marketplace ←→ REUSE Rewards
-         ↓                       ↓                    ↓
-    Governance ←← TRC Tokens ←→ Staking Contract
-         ↓
-    Treasury & Grants
+# Run all tests
+pnpm test
 ```
 
-### Security Considerations
+---
 
-1. **Access Control**: Role-based permissions (OpenZeppelin AccessControl)
-2. **Upgradeability**: Transparent proxy pattern with governance-controlled upgrades
-3. **Rate Limiting**: Prevent spam attacks on minting/listing functions
-4. **Oracle Validation**: Multiple data source verification before critical decisions
-5. **Audit Requirements**: Third-party security audits before mainnet deployment
-6. **Emergency Pause**: Circuit breaker for critical vulnerabilities
-7. **Sybil Resistance**: KYC for high-value transactions, reputation systems
+## Monorepo Structure
 
-### Governance Model
+```
+packages/core/        → Shared types, Zod validators, constants, enums
+packages/db/          → Drizzle ORM schema, migrations, seed data
+packages/api/         → Fastify backend (modules: auth, passport, marketplace, blockchain, quality, governance, hub)
+packages/web/         → Next.js 14 App Router frontend (PWA)
+packages/contracts/   → Solidity smart contracts + Hardhat (VeChain plugin)
+packages/sdk/         → TypeScript SDK for external consumers
+```
 
-#### Stakeholder Participation
-The TRACE marketplace operates as a **commons-based peer production system** where participants collectively govern shared resources (construction materials) while maintaining individual economic incentives.
+Package naming: `@trace/core`, `@trace/db`, `@trace/api`, `@trace/web`, `@trace/contracts`, `@trace/sdk`.
 
-#### Governance Principles
+---
 
-1. **Inclusive Decision-Making**: All ecosystem participants can earn governance rights through active participation, not just financial investment
+## Coding Conventions
 
-2. **Polycentric Governance**: Multiple decision-making centers
-   - **Protocol Level**: Core smart contract upgrades (TRC token holders)
-   - **Hub Level**: Individual reuse hub operational decisions (local governance)
-   - **Community Level**: Standards, certifications, best practices (working groups)
+### TypeScript (all packages)
 
-3. **Ostrom's Common Pool Resource Framework**:
-   - **Clearly Defined Boundaries**: Verified hub registration, material authentication
-   - **Congruence**: Locally adapted rules for Scottish context (different hubs, different needs)
-   - **Collective Choice**: Users affected by rules participate in modifying rules
-   - **Monitoring**: IoT sensors, community reporting, third-party audits
-   - **Graduated Sanctions**: Reputation scores, temporary suspensions, permanent bans
-   - **Conflict Resolution**: Built-in arbitration mechanisms
-   - **Recognition of Rights**: Government acknowledgment through Zero Waste Scotland partnership
+- **Strict mode** everywhere: `"strict": true` in tsconfig
+- **No `any`** — use `unknown` and narrow, or define proper types
+- **Imports:** Named imports, no default exports except React components and Next.js pages
+- **Naming:**
+  - Files: `kebab-case.ts` (e.g., `material-passport.ts`)
+  - Types/Interfaces: `PascalCase` (e.g., `MaterialPassport`)
+  - Functions/variables: `camelCase`
+  - Constants: `UPPER_SNAKE_CASE`
+  - DB columns: `snake_case`
+  - API responses: `camelCase` (transformed from DB snake_case via Drizzle)
+- **Error handling:** All async functions wrapped in try/catch. Use custom error classes from `@trace/core/errors`.
+- **No console.log** in production code — use the logger from `@trace/core/logger` (pino)
 
-4. **Quadratic Governance**: Optional quadratic voting prevents plutocracy
-   - Cost to vote = (number of votes)²
-   - Encourages broad consensus over whale dominance
+### API (Fastify)
 
-5. **Futarchy Elements**: Prediction markets for major decisions
-   - "Bet on outcomes, vote on values"
-   - E.g., market predicts impact of fee changes before implementation
+- **Module pattern:** Each feature is a Fastify plugin in `src/modules/{name}/`:
+  ```
+  modules/passport/
+  ├── passport.routes.ts    # Route definitions with Zod schemas
+  ├── passport.service.ts   # Business logic (no HTTP concerns)
+  ├── passport.schema.ts    # Zod request/response schemas
+  └── passport.test.ts      # Integration tests
+  ```
+- **Route schemas:** Define request body, params, querystring, and response with Zod. Fastify validates automatically.
+- **Response envelope:** All API responses follow:
+  ```json
+  { "success": true, "data": { ... } }
+  { "success": false, "error": { "code": "NOT_FOUND", "message": "..." } }
+  ```
+- **Auth middleware:** JWT token in `Authorization: Bearer <token>`. Decoded user attached to `request.user`.
+- **Tenant isolation:** Middleware reads `organisation_id` from JWT and sets it on request context. All DB queries filter by it automatically via Drizzle.
 
-#### Governance Bodies
+### Frontend (Next.js)
 
-1. **Token Holders Assembly**: All TRC holders vote on proposals
-2. **Technical Committee**: 7 members (elected) review protocol upgrades
-3. **Hub Council**: Representatives from verified reuse hubs (rotating membership)
-4. **Research Advisory**: Academic partners provide evidence-based recommendations
-5. **Emergency Multisig**: 6-of-9 for critical security responses
+- **App Router** with server components by default. Client components only when needed (`'use client'`).
+- **Component naming:** `PascalCase` files for components (e.g., `PassportCard.tsx`)
+- **Page structure:**
+  ```
+  app/(public)/              # Public routes (no auth)
+  app/(auth)/                # Auth routes (login, register)
+  app/(dashboard)/           # Authenticated routes
+  app/(dashboard)/passport/  # Passport-related pages
+  ```
+- **Data fetching:** TanStack Query for client-side. Server components fetch directly via the API client.
+- **Forms:** React Hook Form + Zod schemas imported from `@trace/core`.
+- **Styling:** Tailwind utility classes. No custom CSS files. Use shadcn/ui components.
+- **Mobile-first:** Always write mobile styles first, enhance with `md:` and `lg:` prefixes.
 
-#### Decision Domains
+### Smart Contracts (Solidity)
 
-| Domain | Decision Maker | Vote Threshold | Timelock |
-|--------|---------------|----------------|----------|
-| Protocol Upgrades | Token Holders | 60% approval | 7 days |
-| Fee Adjustments | Token Holders | 50% approval | 2 days |
-| Hub Registration | Hub Council + Token Holders | 70% approval | 0 days |
-| Treasury Spending (>10%) | Token Holders | 75% approval | 7 days |
-| Emergency Actions | Multisig | 6-of-9 | 0 days |
-| Standards & Certifications | Community Working Groups | Rough consensus | N/A |
+- **Version:** `pragma solidity ^0.8.20;`
+- **Hardhat config:** `evmVersion: 'shanghai'` (VeChainThor compatibility)
+- **Plugin:** `@vechain/sdk-hardhat-plugin` for VeChain network connectivity
+- **Testing:** Tests run against Thor Solo node (Docker). Use `npx hardhat test --network vechain_solo`.
+- **Style:** Follow OpenZeppelin patterns. Use `AccessControl` for role management. Events for every state change.
+- **Naming:** Contracts `PascalCase`. Functions `camelCase`. Events `PascalCase`. Constants `UPPER_SNAKE_CASE`.
+- **Gas optimisation:** Batch hash anchoring. Use events over storage where possible. Keep structs tight.
+- **Cross-contract calls:** Contracts reference each other by address stored in a `ContractRegistry` or via constructor injection.
 
-#### Anti-Capture Mechanisms
+### Database
 
-1. **Vote Escrow**: Time-locked tokens receive boosted voting power
-2. **Delegation**: Passive holders delegate to active community members
-3. **Reputation Scores**: Non-transferable reputation complements token voting
-4. **Sybil Resistance**: One verified hub/entity = one additional vote bonus
-5. **Rage Quit**: Minority protection allows exit with proportional treasury share
+- **ORM:** Drizzle ORM. Schema defined in `packages/db/drizzle/schema.ts`.
+- **Migrations:** Generated via `drizzle-kit generate`. Applied via `drizzle-kit migrate`.
+- **Naming:** Tables `snake_case` plural (e.g., `material_passports`). Columns `snake_case`.
+- **IDs:** UUID v7 (`gen_random_uuid()`). Never auto-increment integers.
+- **Timestamps:** Always `TIMESTAMPTZ`. Columns: `created_at`, `updated_at`.
+- **Soft deletes:** No. Use status fields instead (`status: 'decommissioned'`).
+- **JSONB:** Use for flexible/optional attributes (technical_specs, custom_attributes, branding). Structured data gets proper columns.
 
-#### Participatory Budgeting
+---
 
-20% of protocol revenue allocated via participatory budgeting:
-- Community members propose sustainability projects
-- RUS token holders vote on fund allocation
-- Projects must align with circularity goals
+## Blockchain Integration Pattern
 
-### Future Enhancements
+The API is the bridge between off-chain and on-chain. Users never interact with the blockchain directly.
 
-- **Cross-Chain Bridges**: Enable material passports across multiple blockchains
-- **Zero-Knowledge Proofs**: Privacy-preserving commercial data
-- **AI Integration**: Machine learning for material condition prediction
-- **Carbon Credit NFTs**: Tokenize verified carbon savings from reuse
-- **Insurance Protocols**: Decentralized insurance for material quality guarantees
+```
+User Action → API validates → DB write → Queue blockchain job → Worker anchors on-chain → DB updated with tx hash
+```
 
-## Working with This Repository
+**Key pattern for material registration:**
+1. Hub staff submits material via form
+2. API validates, stores in PostgreSQL, generates QR code
+3. Background job: compute `keccak256(JSON-LD passport data)`
+4. Submit to `MaterialRegistry.registerPassport()` via VeChain SDK
+5. On tx confirmation: store `blockchain_tx_hash` and `blockchain_anchored_at` in DB
+6. Passport is now verifiable: anyone can hash the JSON-LD and compare against on-chain record
 
-### Development Phases
+**VeChain SDK usage:**
+```typescript
+import { ThorClient, HttpClient } from '@vechain/sdk-network';
+import { Contract } from '@vechain/sdk-core';
 
-#### MVP1: Traceability System (Current Focus)
-Focus on frictionless material tracking at Stirling Reuse Hub:
-- **Registry Smart Contract**: Verified hub and stakeholder registration
-- **Digital Product Passport (DPP)**: ERC-721 NFT for each material/component
-- **Key Features**:
-  - QR code integration for physical-digital linkage
-  - IoT sensor data integration for automated condition updates
-  - Simple ownership transfer mechanism
-  - IPFS metadata storage for technical specifications
+const thorClient = new ThorClient(new HttpClient('http://localhost:8669'));
+// Use thorClient for all blockchain reads/writes
+```
 
-#### MVP2: Full Digital Marketplace (Future)
-Comprehensive token-based marketplace ecosystem:
-- **Stakeholder Mapping**: Identify all participants (hubs, builders, salvagers, certifiers)
-- **Activity Flow Analysis**: Map interactions and value exchanges
-- **Common Pool Resource Modeling**: Apply Ostrom's framework to shared material resources
-- **Value Pocket Identification**: Locate capture points for economic sustainability
-- **Token Engineering Simulation**: Use cadCAD/TokenSim to model:
-  - Token supply/demand dynamics
-  - Governance participation rates
-  - Market liquidity and fee structures
-  - Attack vector resilience
-- **Full Implementation**: Deploy dual-token system with governance
+**Fee delegation:** When sending transactions on behalf of users, use VeChain's fee delegation so the hub's VTHO covers gas costs:
+```typescript
+// The API server holds the hub's private key and delegates fees
+const delegatorUrl = process.env.FEE_DELEGATOR_URL;
+```
 
-### Typical Tasks
+---
 
-#### Documentation
-- Update research documentation
-- Maintain methodology diagrams
-- Add links to relevant token engineering resources
-- Document stakeholder engagement findings
-- Update project partners or team information
+## Environment Variables
 
-#### MVP1 Development (Priority)
-- Implement `Registry.sol` for hub/stakeholder verification
-- Implement `MaterialPassport.sol` (ERC-721) for digital product passports
-- Build Python backend for QR code generation and scanning
-- Integrate IoT data feeds from Stirling Reuse Hub
-- Create IPFS pinning service for material metadata
-- Develop simple web interface for material registration
+```env
+# Database
+DATABASE_URL=postgresql://trace:trace@localhost:5432/trace
 
-#### MVP2 Preparation
-- Conduct stakeholder interviews and mapping exercises
-- Model common pool resource dynamics
-- Run cadCAD simulations for token economics
-- Design governance mechanisms based on participant feedback
-- Prototype dual-token contracts (TRC, RUS)
+# Redis
+REDIS_URL=redis://localhost:6379
 
-#### Testing & Deployment
-- Write comprehensive Hardhat/Foundry tests
-- Deploy to Polygon Mumbai or Arbitrum Goerli testnet
-- Conduct pilot program at Stirling Reuse Hub
-- Gather user feedback and iterate
+# VeChain
+VECHAIN_NODE_URL=http://localhost:8669        # Thor Solo for dev
+DEPLOYER_PRIVATE_KEY=0x...                    # Contract deployer
+FEE_DELEGATOR_URL=                            # Fee delegation service URL (optional)
 
-### Important Notes
-- **Start Simple**: MVP1 focuses on traceability, not full marketplace
-- MVP1 requires only 2 core contracts: Registry + Material Passport
-- Token economics (TRC/RUS) are MVP2 features - design now, implement later
-- Always test on Layer 2 testnets before considering mainnet
-- Security audits required before handling real-value transactions
-- When adding technical resources, ensure they align with the project's focus on blockchain, IoT, and circular economy
-- Draw.io diagrams should be edited with the Draw.io application or compatible tools
-- Use OpenZeppelin libraries for all standard token implementations
-- Document all design decisions with references to token engineering research
+# Contract addresses (populated after deploy)
+MATERIAL_REGISTRY_ADDRESS=0x...
+MARKETPLACE_ADDRESS=0x...
+CBT_ADDRESS=0x...
+QUALITY_ASSURANCE_ADDRESS=0x...
+IOT_ORACLE_ADDRESS=0x...
+GOVERNANCE_ADDRESS=0x...
+HUB_REGISTRY_ADDRESS=0x...
 
-## Git Workflow
+# Storage
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
 
-The repository uses a simple git workflow:
-- Main branch: `main`
-- Recent commits focus on documentation updates and methodology diagrams
-- Commit messages are concise and descriptive
+# Search
+MEILISEARCH_URL=http://localhost:7700
+MEILISEARCH_KEY=masterKey
 
-When committing changes, follow the existing pattern of clear, straightforward commit messages describing the documentation updates.
+# Auth
+JWT_SECRET=dev-secret-change-in-production
+JWT_EXPIRY=7d
+
+# App
+API_PORT=3001
+WEB_URL=http://localhost:3000
+API_URL=http://localhost:3001
+```
+
+---
+
+## Docker Compose Services
+
+```yaml
+services:
+  thor-solo:
+    image: vechain/thor:latest
+    command: solo --on-demand --persist --api-cors '*' --api-addr 0.0.0.0:8669
+    ports: ["8669:8669"]
+    volumes: [thor-data:/home/thor]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: trace
+      POSTGRES_USER: trace
+      POSTGRES_PASSWORD: trace
+    ports: ["5432:5432"]
+    volumes: [pg-data:/var/lib/postgresql/data]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports: ["9000:9000", "9001:9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    ports: ["7700:7700"]
+    environment:
+      MEILI_MASTER_KEY: masterKey
+```
+
+---
+
+## Key Design Decisions
+
+1. **VeChainThor over Base/Optimism:** Enterprise focus, fee delegation (users don't need crypto), multi-clause transactions (batch operations), sustainability positioning aligned with circular economy mission.
+
+2. **Fastify over Express:** 2-3x faster, built-in schema validation, TypeScript-first plugin system.
+
+3. **Drizzle over Prisma:** Lighter, SQL-first, no binary engine, better for JSONB and raw queries.
+
+4. **Modular monolith:** Single deployable unit with clean module boundaries. Extractable to microservices later if needed. Ideal for Claude Code development.
+
+5. **PWA over native apps:** Single codebase, no app store friction, instant updates. Camera and offline via browser APIs.
+
+6. **UUID v7 over ULID/auto-increment:** Sortable by time, database-native generation, no external dependency.
+
+7. **Material passport schema is universal:** Designed for ANY construction material (new or reclaimed). Circular economy metadata is an extension layer, not the core. This positions the platform for the broader EU DPP market.
+
+---
+
+## Common Tasks
+
+### Add a new API endpoint
+1. Define Zod schemas in `modules/{name}/{name}.schema.ts`
+2. Write business logic in `modules/{name}/{name}.service.ts`
+3. Register route in `modules/{name}/{name}.routes.ts`
+4. Write integration test in `modules/{name}/{name}.test.ts`
+5. Run `pnpm --filter @trace/api test`
+
+### Add a new database table
+1. Add table definition in `packages/db/drizzle/schema.ts`
+2. Generate migration: `pnpm --filter @trace/db generate`
+3. Apply migration: `pnpm --filter @trace/db migrate`
+4. Add corresponding TypeScript types in `packages/core/src/types/`
+5. Add Zod validators in `packages/core/src/validators/`
+
+### Deploy a new smart contract
+1. Write contract in `packages/contracts/contracts/`
+2. Write tests in `packages/contracts/test/`
+3. Run tests: `pnpm --filter @trace/contracts test`
+4. Add to deploy script in `packages/contracts/scripts/deploy.ts`
+5. Deploy to Solo: `pnpm --filter @trace/contracts deploy:solo`
+6. Update `.env` with new contract address
+
+### Add a new frontend page
+1. Create page file in `packages/web/app/(dashboard)/{route}/page.tsx`
+2. Use server components for data fetching where possible
+3. Create client components in `packages/web/components/` only when interactivity needed
+4. Use Zod schemas from `@trace/core` for form validation
+5. Mobile-first: test at 375px before desktop
+
+---
+
+## Testing Commands
+
+```bash
+pnpm test                                    # All tests
+pnpm --filter @trace/api test                # API unit + integration
+pnpm --filter @trace/web test                # Frontend tests
+pnpm --filter @trace/contracts test          # Smart contract tests (requires Thor Solo)
+pnpm --filter @trace/core test               # Core validators/utils
+pnpm e2e                                     # Playwright E2E (requires all services running)
+```
+
+---
+
+## Current Sprint Focus
+
+**Sprint 0 → S1: Foundation + Vertical Slice 1**
+
+Goal: Register a material → anchor on VeChain → generate QR → scan QR → view passport.
+
+Priority order:
+1. Docker Compose with Thor Solo + PostgreSQL + Redis
+2. Database schema + migrations (core tables only)
+3. `MaterialRegistry.sol` deployed to Thor Solo
+4. API: POST /api/v1/passports (create + blockchain anchor)
+5. API: GET /api/v1/passports/:id (read with verification)
+6. QR code generation on passport creation
+7. Public passport view page (scan QR → see material data)
+8. Basic auth (JWT, hub staff role)
+
+Everything else can wait. Get this loop working first.
