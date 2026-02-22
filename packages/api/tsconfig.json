@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true,
+    "lib": ["ES2022"],
+    "paths": {
+      "@trace/core": ["../core/src/index.ts"],
+      "@trace/core/*": ["../core/src/*"],
+      "@trace/db": ["../db/src/index.ts"],
+      "@trace/db/*": ["../db/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../db" }
+  ]
+}

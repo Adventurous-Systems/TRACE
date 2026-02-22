@@ -1,0 +1,102 @@
+// Types
+export type {
+  PassportStatus,
+  ConditionGrade,
+  DeconstructionMethod,
+  MaterialComponent,
+  Dimensions,
+  HazardousSubstance,
+  EPCISEvent,
+  MaterialPassport,
+} from './types/passport.js';
+
+export type { UserRole, User, JwtPayload } from './types/user.js';
+
+export type {
+  ListingStatus,
+  TransactionStatus,
+  ShippingOption,
+  Listing,
+  Transaction,
+} from './types/listing.js';
+
+export type { OrganisationType, OrganisationBranding, Organisation } from './types/hub.js';
+
+// Constants
+export {
+  MATERIAL_CATEGORIES,
+  CATEGORY_L1_SLUGS,
+  getCategoryBySlug,
+  getSubcategoryBySlug,
+  isValidL2ForL1,
+} from './constants/categories.js';
+export type { Category, Subcategory } from './constants/categories.js';
+
+export {
+  PASSPORT_STATUSES,
+  CONDITION_GRADES,
+  DECONSTRUCTION_METHODS,
+  USER_ROLES,
+  ORGANISATION_TYPES,
+  LISTING_STATUSES,
+  TRANSACTION_STATUSES,
+  PROTOTYPE_GS1_PREFIX,
+  CBT_REWARDS,
+  GOVERNANCE,
+  BLOCKCHAIN,
+  CONDITION_GRADE_LABELS,
+} from './constants/config.js';
+
+// Validators
+export {
+  CreatePassportSchema,
+  UpdatePassportSchema,
+  PassportStatusSchema,
+  PassportQuerySchema,
+} from './validators/passport.schema.js';
+export type {
+  CreatePassportInput,
+  UpdatePassportInput,
+  PassportQueryInput,
+} from './validators/passport.schema.js';
+
+export {
+  LoginSchema,
+  RegisterSchema,
+  JwtPayloadSchema,
+  CreateOrganisationSchema,
+} from './validators/auth.schema.js';
+export type {
+  LoginInput,
+  RegisterInput,
+  JwtPayloadInput,
+  CreateOrganisationInput,
+} from './validators/auth.schema.js';
+
+export {
+  CreateListingSchema,
+  UpdateListingSchema,
+  MakeOfferSchema,
+  MarketplaceQuerySchema,
+  UpdateTransactionSchema,
+} from './validators/listing.schema.js';
+export type {
+  CreateListingInput,
+  UpdateListingInput,
+  MakeOfferInput,
+  MarketplaceQueryInput,
+  UpdateTransactionInput,
+} from './validators/listing.schema.js';
+
+// Errors
+export {
+  TraceError,
+  NotFoundError,
+  UnauthorizedError,
+  ForbiddenError,
+  ValidationError,
+  ConflictError,
+  BlockchainError,
+  InternalError,
+  isTraceError,
+} from './errors.js';

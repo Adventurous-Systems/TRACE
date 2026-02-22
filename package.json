@@ -1,0 +1,37 @@
+{
+  "name": "trace",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && docker compose up -d",
+    "docker:logs": "docker compose logs -f",
+    "db:migrate": "pnpm --filter @trace/db migrate",
+    "db:seed": "pnpm --filter @trace/db seed",
+    "db:generate": "pnpm --filter @trace/db generate",
+    "db:studio": "pnpm --filter @trace/db studio"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["bcrypt", "esbuild", "keccak", "msgpackr-extract", "secp256k1"]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}
