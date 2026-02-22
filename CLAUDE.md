@@ -2,7 +2,7 @@
 
 ## What is this project?
 
-TRACE is a blockchain-enabled digital marketplace for construction material reuse hubs. It issues EU DPP-compliant material passports, anchors integrity proofs on VeChainThor, and governs the system through Ostrom commons principles via smart contracts.
+[TRACE](https://trace.construction/) is a blockchain-enabled digital marketplace for construction material reuse hubs. It issues EU DPP-compliant material passports, anchors integrity proofs on VeChainThor, and governs the system through Ostrom commons principles via smart contracts.
 
 **Read `SPEC.md` for the full specification.** This file covers conventions and quick-reference only.
 
