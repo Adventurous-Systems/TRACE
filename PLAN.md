@@ -1,7 +1,7 @@
 # TRACE — Build Plan
 
-> Last updated: 2026-02-22
-> Status: **Sprint 0 in progress.** S0-1 through S0-4 complete. S0-5 partially done (env, middleware written; server.ts, modules, tests pending).
+> Last updated: 2026-02-23
+> Status: **Sprint 0 complete. Sprint 1 not started.** All foundation packages built and typechecking clean. Auth integration tests require Docker infrastructure.
 
 ---
 
@@ -18,7 +18,7 @@
 | Docker Compose stack | **COMPLETE** ✓ |
 | `@trace/core` | **COMPLETE** ✓ |
 | `@trace/db` | **COMPLETE** ✓ |
-| `@trace/api` skeleton | **IN PROGRESS** — env + middleware done, server/modules/tests pending |
+| `@trace/api` skeleton | **COMPLETE** ✓ |
 | `@trace/web` scaffold | NOT STARTED |
 | `@trace/contracts` | NOT STARTED |
 | `@trace/sdk` | NOT STARTED (placeholder only) |
@@ -29,7 +29,7 @@
 
 | Sprint | Duration | Status | Deliverable |
 |--------|----------|--------|-------------|
-| **S0** | 1 week | `IN PROGRESS` | Monorepo, Docker, core packages |
+| **S0** | 1 week | `COMPLETE` ✓ | Monorepo, Docker, core packages |
 | **S1** | 2 weeks | `NOT STARTED` | Register material → anchor → QR → view passport |
 <!-- S0 subtasks below for reference -->
 | **S2** | 2 weeks | `NOT STARTED` | Marketplace: list, search, buy |
@@ -143,7 +143,7 @@ Drizzle ORM schema, migrations, and seed data.
 - [ ] Export: typed `db` instance, all table references, inferred insert/select types
 
 ### S0-5 — `@trace/api` Skeleton
-**Status:** `IN PROGRESS`
+**Status:** `COMPLETE` ✓
 
 Fastify server with auth, middleware, and module structure in place.
 
@@ -158,6 +158,13 @@ Fastify server with auth, middleware, and module structure in place.
 - [ ] Response envelope enforced on all routes: `{success: true, data}` / `{success: false, error: {code, message}}`
 - [ ] Vitest + Supertest integration test setup
 - [ ] `package.json` scripts: `dev` (tsx watch), `build` (tsc), `test`, `typecheck`
+
+**Notes:**
+- Fastify v5 requires `@fastify/cors@^10` and `@fastify/multipart@^9` (fixed from v9/v8)
+- `LOG_LEVEL` enum extended to include `silent` for test suppression
+- Vitest `env` config supplies test env vars before ESM module evaluation (avoids `setupFiles` race)
+- Health tests pass standalone; auth tests are integration tests requiring PostgreSQL (Docker)
+- Typecheck is clean across both `tsconfig.json` (dev) and `tsconfig.build.json` (prod)
 
 ---
 

@@ -3,11 +3,11 @@ import { ZodError } from 'zod';
 import { isTraceError } from '@trace/core';
 
 export function errorHandler(
-  error: FastifyError | Error,
+  error: FastifyError,
   request: FastifyRequest,
   reply: FastifyReply,
 ): void {
-  // Known application errors
+  // Known application errors (TraceError and subclasses)
   if (isTraceError(error)) {
     void reply.status(error.statusCode).send({
       success: false,
@@ -16,7 +16,7 @@ export function errorHandler(
     return;
   }
 
-  // Zod validation errors (from manual .parse() calls)
+  // Zod validation errors (from manual .parse() calls in route handlers)
   if (error instanceof ZodError) {
     void reply.status(400).send({
       success: false,
@@ -29,21 +29,20 @@ export function errorHandler(
     return;
   }
 
-  // Fastify built-in errors (route not found, method not allowed, etc.)
-  const statusCode = 'statusCode' in error && typeof error.statusCode === 'number'
-    ? error.statusCode
-    : 500;
+  // Fastify built-in client errors (404, 405, etc.)
+  // FastifyError always has statusCode and code as per @fastify/types
+  const statusCode = error.statusCode ?? 500;
 
   if (statusCode < 500) {
     void reply.status(statusCode).send({
       success: false,
-      error: { code: 'REQUEST_ERROR', message: error.message },
+      error: { code: error.code, message: error.message },
     });
     return;
   }
 
-  // Unexpected server errors — log and return generic message
-  request.log.error({ err: error }, 'Unhandled error');
+  // Unexpected server errors — log full error, return generic message
+  request.log.error({ err: error }, 'Unhandled server error');
   void reply.status(500).send({
     success: false,
     error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' },
