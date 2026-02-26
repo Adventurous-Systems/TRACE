@@ -9,7 +9,7 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@trace/core": ["../core/src/index.ts"],
       "@trace/core/*": ["../core/src/*"]
     }

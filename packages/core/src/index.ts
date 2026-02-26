@@ -88,6 +88,10 @@ export type {
   UpdateTransactionInput,
 } from './validators/listing.schema.js';
 
+// Logger
+export { createLogger, logger } from './logger.js';
+export type { Logger } from './logger.js';
+
 // Errors
 export {
   TraceError,

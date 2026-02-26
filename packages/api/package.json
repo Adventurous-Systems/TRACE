@@ -12,22 +12,24 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@trace/core": "workspace:*",
-    "@trace/db": "workspace:*",
-    "dotenv": "^16.4.0",
-    "drizzle-orm": "^0.36.0",
-    "zod": "^3.23.0",
     "@fastify/cors": "^10.0.0",
     "@fastify/jwt": "^9.0.1",
     "@fastify/multipart": "^9.0.0",
     "@fastify/rate-limit": "^10.1.1",
+    "@trace/core": "workspace:*",
+    "@trace/db": "workspace:*",
     "@vechain/sdk-core": "^1.0.0",
     "@vechain/sdk-network": "^1.0.0",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.13.0",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.36.0",
+    "ethers": "^6.16.0",
     "fastify": "^5.0.0",
     "ioredis": "^5.4.1",
-    "qrcode": "^1.5.4"
+    "minio": "^8.0.6",
+    "qrcode": "^1.5.4",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
