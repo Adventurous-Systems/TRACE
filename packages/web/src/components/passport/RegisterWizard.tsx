@@ -79,8 +79,9 @@ export default function RegisterWizard() {
     getValues,
     setValue,
     formState: { errors, isSubmitting },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } = useForm<WizardForm>({
-    resolver: zodResolver(WizardSchema),
+    resolver: zodResolver(WizardSchema) as any,
     defaultValues: {
       dimensionUnit: 'mm',
       ceMarking: false,
@@ -123,7 +124,8 @@ export default function RegisterWizard() {
     if (prev) setStep(prev.id);
   }
 
-  async function onSubmit(data: WizardForm) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function onSubmit(data: any) {
     setError(null);
     const token = getToken();
     if (!token) {
@@ -234,7 +236,7 @@ export default function RegisterWizard() {
                 <option value="">Select a category</option>
                 {MATERIAL_CATEGORIES.map((c) => (
                   <option key={c.slug} value={c.slug}>
-                    {c.name}
+                    {c.label}
                   </option>
                 ))}
               </select>
@@ -254,7 +256,7 @@ export default function RegisterWizard() {
                   <option value="">Select subcategory</option>
                   {l2Options.map((s) => (
                     <option key={s.slug} value={s.slug}>
-                      {s.name}
+                      {s.label}
                     </option>
                   ))}
                 </select>

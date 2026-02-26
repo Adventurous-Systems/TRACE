@@ -15,7 +15,7 @@ import { Worker, type Job } from 'bullmq';
 import { eq } from 'drizzle-orm';
 import { db, materialPassports, type MaterialPassport } from '@trace/db';
 import { createLogger } from '@trace/core';
-import { ThorClient, HttpClient } from '@vechain/sdk-network';
+import { ThorClient } from '@vechain/sdk-network';
 import { keccak256, Interface, Wallet } from 'ethers';
 import { env } from '../env.js';
 import { redisConnection, type AnchorPassportJob } from '../lib/queue.js';
@@ -25,7 +25,7 @@ const logger = createLogger('anchor-worker');
 // ─── VeChain setup ─────────────────────────────────────────────────────────
 
 function getThorClient() {
-  return new ThorClient(new HttpClient(env.VECHAIN_NODE_URL));
+  return ThorClient.at(env.VECHAIN_NODE_URL);
 }
 
 // Minimal ABI for MaterialRegistry

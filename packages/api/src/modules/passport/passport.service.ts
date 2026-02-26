@@ -253,14 +253,18 @@ export async function getPassportHistory(passportId: string): Promise<unknown[]>
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildInsertValues(input: CreatePassportInput | UpdatePassportInput) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type InsertRow = Record<string, any>;
+
+function buildInsertValues(input: CreatePassportInput | UpdatePassportInput): InsertRow {
   return {
     productName: input.productName,
     categoryL1: input.categoryL1,
     categoryL2: input.categoryL2 ?? null,
-    materialComposition: input.materialComposition ?? [],
-    dimensions: input.dimensions ?? null,
-    technicalSpecs: input.technicalSpecs ?? {},
+    // Cast JSONB arrays/objects to bypass exactOptionalPropertyTypes friction
+    materialComposition: (input.materialComposition ?? []) as unknown,
+    dimensions: (input.dimensions ?? null) as unknown,
+    technicalSpecs: (input.technicalSpecs ?? {}) as unknown,
     manufacturerName: input.manufacturerName ?? null,
     countryOfOrigin: input.countryOfOrigin ?? null,
     productionDate: input.productionDate ?? null,
@@ -282,9 +286,9 @@ function buildInsertValues(input: CreatePassportInput | UpdatePassportInput) {
     carbonSavingsVsNew:
       input.carbonSavingsVsNew !== undefined ? String(input.carbonSavingsVsNew) : null,
     circularityScore: input.circularityScore ?? null,
-    reuseSuitability: input.reuseSuitability ?? [],
+    reuseSuitability: (input.reuseSuitability ?? []) as unknown,
     handlingRequirements: input.handlingRequirements ?? null,
-    hazardousSubstances: input.hazardousSubstances ?? [],
-    customAttributes: input.customAttributes ?? {},
+    hazardousSubstances: (input.hazardousSubstances ?? []) as unknown,
+    customAttributes: (input.customAttributes ?? {}) as unknown,
   };
 }

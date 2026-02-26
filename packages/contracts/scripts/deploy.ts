@@ -3,15 +3,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hre = require('hardhat') as any;
+  const signers = await hre.ethers.getSigners();
+  const deployer = signers[0];
+  if (!deployer) throw new Error('No deployer account found');
+
   console.log('Deploying contracts with account:', deployer.address);
 
-  const balance = await ethers.provider.getBalance(deployer.address);
+  const balance = await hre.ethers.provider.getBalance(deployer.address);
   console.log('Account balance:', ethers.formatEther(balance), 'VET');
 
   // Deploy MaterialRegistry
   console.log('\nDeploying MaterialRegistry...');
-  const MaterialRegistry = await ethers.getContractFactory('MaterialRegistry');
+  const MaterialRegistry = await hre.ethers.getContractFactory('MaterialRegistry');
   const registry = await MaterialRegistry.deploy(deployer.address);
   await registry.waitForDeployment();
 
@@ -24,10 +29,9 @@ async function main() {
   await tx.wait();
   console.log('HUB_ROLE granted to deployer for dev');
 
-  // Write addresses to a JSON file for the API to read
   const addresses = {
     MaterialRegistry: registryAddress,
-    network: process.env.HARDHAT_NETWORK ?? 'vechain_solo',
+    network: process.env['HARDHAT_NETWORK'] ?? 'vechain_solo',
     deployedAt: new Date().toISOString(),
     deployedBy: deployer.address,
   };
@@ -36,7 +40,6 @@ async function main() {
   fs.writeFileSync(outPath, JSON.stringify(addresses, null, 2));
   console.log('\nAddresses written to', outPath);
 
-  // Print env vars to paste into .env
   console.log('\n─── Add these to your .env ───────────────────────');
   console.log(`MATERIAL_REGISTRY_ADDRESS=${registryAddress}`);
   console.log('──────────────────────────────────────────────────');

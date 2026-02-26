@@ -119,8 +119,10 @@ export interface PassportDetail extends PassportSummary {
   previousBuildingId: string | null;
   deconstructionDate: string | null;
   deconstructionMethod: string | null;
+  reclaimedBy: string | null;
   remainingLifeEstimate: number | null;
   carbonSavingsVsNew: string | null;
+  handlingRequirements: string | null;
   hazardousSubstances: Array<{ name: string; casNumber?: string; concentration?: string; hazardClass?: string }>;
   blockchainPassportHash: string | null;
   verified?: boolean;

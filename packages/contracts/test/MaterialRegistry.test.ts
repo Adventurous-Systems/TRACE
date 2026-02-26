@@ -1,15 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import { MaterialRegistry } from '../typechain-types';
-import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers';
+import type { MaterialRegistry } from '../typechain-types';
+
+// Hardhat's ethers is augmented at runtime but TS doesn't know the full type.
+// Cast to any for getSigners/provider — this is standard hardhat test pattern.
+const hre: any = require('hardhat');
 
 describe('MaterialRegistry', () => {
   let registry: MaterialRegistry;
-  let admin: HardhatEthersSigner;
-  let hub: HardhatEthersSigner;
-  let other: HardhatEthersSigner;
-
-  const HUB_ROLE = ethers.keccak256(ethers.toUtf8Bytes('HUB_ROLE'));
+  let admin: any;
+  let hub: any;
+  let other: any;
 
   // Helpers
   function randomId(): string {
@@ -21,13 +23,12 @@ describe('MaterialRegistry', () => {
   }
 
   beforeEach(async () => {
-    [admin, hub, other] = await ethers.getSigners();
+    [admin, hub, other] = await hre.ethers.getSigners();
 
-    const MaterialRegistry = await ethers.getContractFactory('MaterialRegistry');
-    registry = await MaterialRegistry.deploy(admin.address);
+    const MaterialRegistryFactory = await hre.ethers.getContractFactory('MaterialRegistry');
+    registry = (await MaterialRegistryFactory.deploy(admin.address)) as unknown as MaterialRegistry;
     await registry.waitForDeployment();
 
-    // Grant HUB_ROLE to hub signer
     await registry.connect(admin).grantHubRole(hub.address);
   });
 
@@ -43,10 +44,10 @@ describe('MaterialRegistry', () => {
     });
 
     it('reverts with zero admin address', async () => {
-      const Factory = await ethers.getContractFactory('MaterialRegistry');
+      const Factory = await hre.ethers.getContractFactory('MaterialRegistry');
       await expect(Factory.deploy(ethers.ZeroAddress)).to.be.revertedWithCustomError(
         registry,
-        'InvalidAddress'
+        'InvalidAddress',
       );
     });
   });
@@ -83,7 +84,7 @@ describe('MaterialRegistry', () => {
       await registry.connect(hub).registerPassport(pid, hash, 'uri');
 
       await expect(
-        registry.connect(hub).registerPassport(pid, hashPassport('other'), 'uri')
+        registry.connect(hub).registerPassport(pid, hashPassport('other'), 'uri'),
       ).to.be.revertedWithCustomError(registry, 'PassportAlreadyExists');
     });
 
@@ -92,19 +93,19 @@ describe('MaterialRegistry', () => {
       await registry.connect(hub).registerPassport(randomId(), hash, 'uri');
 
       await expect(
-        registry.connect(hub).registerPassport(randomId(), hash, 'uri')
+        registry.connect(hub).registerPassport(randomId(), hash, 'uri'),
       ).to.be.revertedWithCustomError(registry, 'HashAlreadyRegistered');
     });
 
     it('reverts if called by non-hub', async () => {
       await expect(
-        registry.connect(other).registerPassport(randomId(), hashPassport('x'), 'uri')
+        registry.connect(other).registerPassport(randomId(), hashPassport('x'), 'uri'),
       ).to.be.reverted;
     });
 
     it('reverts with zero passportId', async () => {
       await expect(
-        registry.connect(hub).registerPassport(ethers.ZeroHash, hashPassport('x'), 'uri')
+        registry.connect(hub).registerPassport(ethers.ZeroHash, hashPassport('x'), 'uri'),
       ).to.be.revertedWithCustomError(registry, 'InvalidPassportId');
     });
   });
@@ -155,7 +156,7 @@ describe('MaterialRegistry', () => {
       const pid = randomId();
       await registry.connect(hub).registerPassport(pid, hashPassport('s'), 'uri');
 
-      await expect(registry.connect(hub).updateStatus(pid, 1)) // Listed
+      await expect(registry.connect(hub).updateStatus(pid, 1))
         .to.emit(registry, 'PassportStatusChanged')
         .withArgs(pid, 0, 1, await latestTimestamp());
 
@@ -167,10 +168,9 @@ describe('MaterialRegistry', () => {
       const pid = randomId();
       await registry.connect(hub).registerPassport(pid, hashPassport('s2'), 'uri');
 
-      await expect(registry.connect(other).updateStatus(pid, 1)).to.be.revertedWithCustomError(
-        registry,
-        'NotPassportOwner'
-      );
+      await expect(
+        registry.connect(other).updateStatus(pid, 1),
+      ).to.be.revertedWithCustomError(registry, 'NotPassportOwner');
     });
 
     it('admin can update any status', async () => {
@@ -196,7 +196,6 @@ describe('MaterialRegistry', () => {
       const [valid] = await registry.verifyPassport(pid, newHash);
       expect(valid).to.be.true;
 
-      // old hash no longer mapped
       expect(await registry.getPassportByHash(oldHash)).to.equal(ethers.ZeroHash);
     });
   });
@@ -221,7 +220,7 @@ describe('MaterialRegistry', () => {
       await registry.connect(hub).registerPassport(pid, hashPassport('t2'), 'uri');
 
       await expect(
-        registry.connect(other).transferPassport(pid, other.address)
+        registry.connect(other).transferPassport(pid, other.address),
       ).to.be.revertedWithCustomError(registry, 'NotPassportOwner');
     });
   });
@@ -232,12 +231,12 @@ describe('MaterialRegistry', () => {
     it('admin can pause and unpause', async () => {
       await registry.connect(admin).pause();
       await expect(
-        registry.connect(hub).registerPassport(randomId(), hashPassport('p'), 'uri')
+        registry.connect(hub).registerPassport(randomId(), hashPassport('p'), 'uri'),
       ).to.be.reverted;
 
       await registry.connect(admin).unpause();
       await expect(
-        registry.connect(hub).registerPassport(randomId(), hashPassport('p'), 'uri')
+        registry.connect(hub).registerPassport(randomId(), hashPassport('p2'), 'uri'),
       ).to.not.be.reverted;
     });
   });
@@ -245,7 +244,7 @@ describe('MaterialRegistry', () => {
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
   async function latestTimestamp(): Promise<number> {
-    const block = await ethers.provider.getBlock('latest');
+    const block = await hre.ethers.provider.getBlock('latest');
     return block!.timestamp;
   }
 });
