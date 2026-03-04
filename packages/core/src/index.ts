@@ -22,6 +22,8 @@ export type {
 
 export type { OrganisationType, OrganisationBranding, Organisation } from './types/hub.js';
 
+export type { QualityGrade, QualityReport } from './types/quality.js';
+
 // Constants
 export {
   MATERIAL_CATEGORIES,
@@ -87,6 +89,15 @@ export type {
   MarketplaceQueryInput,
   UpdateTransactionInput,
 } from './validators/listing.schema.js';
+
+export {
+  CreateQualityReportSchema,
+  QualityQuerySchema,
+} from './validators/quality.schema.js';
+export type {
+  CreateQualityReportInput,
+  QualityQueryInput,
+} from './validators/quality.schema.js';
 
 // Logger
 export { createLogger, logger } from './logger.js';

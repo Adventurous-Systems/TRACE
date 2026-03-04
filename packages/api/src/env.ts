@@ -29,7 +29,7 @@ const envSchema = z.object({
   GOVERNANCE_ADDRESS: z.string().optional(),
   HUB_REGISTRY_ADDRESS: z.string().optional(),
   CONTRACT_REGISTRY_ADDRESS: z.string().optional(),
-  FEE_DELEGATOR_URL: z.string().url().optional(),
+  FEE_DELEGATOR_URL: z.string().transform(v => v || undefined).pipe(z.string().url().optional()),
 
   // MinIO
   MINIO_ENDPOINT: z.string().default('localhost'),

@@ -11,7 +11,7 @@ import {
   index,
   unique,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
+import { sql, relations } from 'drizzle-orm';
 
 // ── Organisations ────────────────────────────────────────────────────────────
 
@@ -308,3 +308,99 @@ export const sensorReadings = pgTable(
 
 export type SensorReading = typeof sensorReadings.$inferSelect;
 export type NewSensorReading = typeof sensorReadings.$inferInsert;
+
+// ── Relations ────────────────────────────────────────────────────────────────
+
+export const organisationsRelations = relations(organisations, ({ many }) => ({
+  users: many(users),
+  materialPassports: many(materialPassports),
+  listings: many(listings),
+}));
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [users.organisationId],
+    references: [organisations.id],
+  }),
+  passportsRegistered: many(materialPassports),
+  listings: many(listings),
+  buyerTransactions: many(transactions, { relationName: 'buyer' }),
+  sellerTransactions: many(transactions, { relationName: 'seller' }),
+}));
+
+export const materialPassportsRelations = relations(materialPassports, ({ one, many }) => ({
+  organisation: one(organisations, {
+    fields: [materialPassports.organisationId],
+    references: [organisations.id],
+  }),
+  registeredByUser: one(users, {
+    fields: [materialPassports.registeredBy],
+    references: [users.id],
+  }),
+  events: many(passportEvents),
+  listings: many(listings),
+  qualityReports: many(qualityReports),
+  sensorReadings: many(sensorReadings),
+}));
+
+export const passportEventsRelations = relations(passportEvents, ({ one }) => ({
+  passport: one(materialPassports, {
+    fields: [passportEvents.passportId],
+    references: [materialPassports.id],
+  }),
+  actor: one(users, {
+    fields: [passportEvents.actorId],
+    references: [users.id],
+  }),
+}));
+
+export const listingsRelations = relations(listings, ({ one, many }) => ({
+  passport: one(materialPassports, {
+    fields: [listings.passportId],
+    references: [materialPassports.id],
+  }),
+  organisation: one(organisations, {
+    fields: [listings.organisationId],
+    references: [organisations.id],
+  }),
+  seller: one(users, {
+    fields: [listings.sellerId],
+    references: [users.id],
+  }),
+  transactions: many(transactions),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  listing: one(listings, {
+    fields: [transactions.listingId],
+    references: [listings.id],
+  }),
+  buyer: one(users, {
+    fields: [transactions.buyerId],
+    references: [users.id],
+    relationName: 'buyer',
+  }),
+  seller: one(users, {
+    fields: [transactions.sellerId],
+    references: [users.id],
+    relationName: 'seller',
+  }),
+}));
+
+export const qualityReportsRelations = relations(qualityReports, ({ one }) => ({
+  passport: one(materialPassports, {
+    fields: [qualityReports.passportId],
+    references: [materialPassports.id],
+  }),
+  inspector: one(users, {
+    fields: [qualityReports.inspectorId],
+    references: [users.id],
+  }),
+}));
+
+export const sensorReadingsRelations = relations(sensorReadings, ({ one }) => ({
+  passport: one(materialPassports, {
+    fields: [sensorReadings.passportId],
+    references: [materialPassports.id],
+  }),
+}));

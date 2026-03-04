@@ -34,6 +34,8 @@ export default function DashboardLayout({ children }: Props) {
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/passports', label: 'Passports' },
+    { href: '/listings', label: 'Listings' },
+    { href: '/transactions', label: 'Orders' },
     { href: '/scan', label: 'Scan QR' },
   ];
 

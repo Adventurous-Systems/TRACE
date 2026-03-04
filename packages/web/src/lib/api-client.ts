@@ -135,6 +135,102 @@ export interface PassportListResponse {
   limit: number;
 }
 
+// ─── Marketplace ──────────────────────────────────────────────────────────
+
+export interface ListingPassport {
+  productName: string;
+  categoryL1: string;
+  categoryL2: string | null;
+  conditionGrade: string | null;
+  conditionNotes: string | null;
+  carbonSavingsVsNew: string | null;
+  qrCodeUrl: string | null;
+}
+
+export interface ListingShippingOption {
+  method: string;
+  deliveryRadiusMiles?: number;
+  deliveryCostPence?: number;
+  notes?: string;
+}
+
+export interface ListingSummary {
+  id: string;
+  passportId: string;
+  organisationId: string;
+  sellerId: string;
+  pricePence: number;
+  currency: string;
+  quantity: number;
+  shippingOptions: ListingShippingOption[];
+  status: string;
+  expiresAt: string | null;
+  createdAt: string;
+  passport: ListingPassport;
+  organisation: { name: string; slug: string };
+}
+
+export interface MarketplaceListResponse {
+  data: ListingSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface MarketplaceTransaction {
+  id: string;
+  listingId: string;
+  buyerId: string;
+  sellerId: string;
+  amountPence: number;
+  status: string;
+  disputeDeadline: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export const marketplace = {
+  search: (params: URLSearchParams) =>
+    request<MarketplaceListResponse>(`/api/v1/marketplace/listings?${params.toString()}`),
+
+  hubListings: (token: string) =>
+    request<ListingSummary[]>('/api/v1/marketplace/listings/hub', { token }),
+
+  getListing: (id: string) =>
+    request<ListingSummary>(`/api/v1/marketplace/listings/${id}`),
+
+  createListing: (data: unknown, token: string) =>
+    request<ListingSummary>('/api/v1/marketplace/listings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  cancelListing: (id: string, token: string) =>
+    request<ListingSummary>(`/api/v1/marketplace/listings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action: 'cancel' }),
+      token,
+    }),
+
+  makeOffer: (data: { listingId: string; offerPencE?: number; notes?: string }, token: string) =>
+    request<MarketplaceTransaction>('/api/v1/marketplace/offers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  transactions: (token: string) =>
+    request<MarketplaceTransaction[]>('/api/v1/marketplace/transactions', { token }),
+
+  updateTransaction: (id: string, action: string, token: string, notes?: string) =>
+    request<MarketplaceTransaction>(`/api/v1/marketplace/transactions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action, notes }),
+      token,
+    }),
+};
+
 export const passports = {
   list: (params: URLSearchParams, token: string) =>
     request<PassportListResponse>(`/api/v1/passports?${params.toString()}`, { token }),

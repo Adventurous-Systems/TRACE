@@ -49,7 +49,7 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const result = await listPassports(query, organisationId);
-      return reply.send({ success: true, ...result });
+      return reply.send({ success: true, data: result });
     },
   );
 

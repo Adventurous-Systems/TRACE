@@ -66,6 +66,18 @@ export default function PassportDetailPage() {
             <Badge variant={anchored ? 'success' : 'outline'}>
               {anchored ? 'Anchored ✓' : 'Pending anchor'}
             </Badge>
+            {passport.status === 'active' && (
+              <Link href={`/listings/new?passportId=${id}`}>
+                <Button size="sm" className="bg-brand-600 hover:bg-brand-700">
+                  List for sale
+                </Button>
+              </Link>
+            )}
+            {passport.status === 'listed' && (
+              <Link href="/listings">
+                <Button variant="outline" size="sm">View listing</Button>
+              </Link>
+            )}
             <Link href={`/passport/${id}`} target="_blank">
               <Button variant="outline" size="sm">
                 Public view ↗

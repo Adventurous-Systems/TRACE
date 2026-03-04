@@ -39,8 +39,8 @@ export default function PassportsPage() {
     passports
       .list(params, token)
       .then((res) => {
-        setItems(res.data);
-        setTotal(res.total);
+        setItems(res.data ?? []);
+        setTotal(res.total ?? 0);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -95,11 +95,8 @@ export default function PassportsPage() {
               <ul className="divide-y">
                 {items.map((p) => (
                   <li key={p.id}>
-                    <Link
-                      href={`/passports/${p.id}`}
-                      className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <Link href={`/passports/${p.id}`} className="min-w-0 flex-1">
                         <p className="font-medium text-sm truncate">{p.productName}</p>
                         <p className="text-xs text-gray-500">
                           {p.categoryL1}
@@ -108,7 +105,7 @@ export default function PassportsPage() {
                           {' · '}
                           {new Date(p.createdAt).toLocaleDateString()}
                         </p>
-                      </div>
+                      </Link>
                       <div className="flex items-center gap-2 ml-4 shrink-0">
                         {p.blockchainTxHash && (
                           <span className="text-xs text-green-600" title="Anchored on VeChainThor">⛓</span>
@@ -116,8 +113,15 @@ export default function PassportsPage() {
                         <Badge variant={STATUS_COLORS[p.status] ?? 'outline'}>
                           {p.status}
                         </Badge>
+                        {p.status === 'active' && (
+                          <Link href={`/listings/new?passportId=${p.id}`}>
+                            <Button size="sm" variant="outline" className="text-brand-600 border-brand-600 hover:bg-brand-50">
+                              List for sale
+                            </Button>
+                          </Link>
+                        )}
                       </div>
-                    </Link>
+                    </div>
                   </li>
                 ))}
               </ul>
