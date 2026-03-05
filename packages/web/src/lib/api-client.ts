@@ -231,6 +231,56 @@ export const marketplace = {
     }),
 };
 
+// ─── Quality ──────────────────────────────────────────────────────────────
+
+export interface QualityReportSummary {
+  id: string;
+  passportId: string;
+  inspectorId: string;
+  structuralScore: number | null;
+  aestheticScore: number | null;
+  environmentalScore: number | null;
+  overallGrade: 'A' | 'B' | 'C' | 'D' | null;
+  reportNotes: string | null;
+  photoUrls: string[];
+  blockchainTxHash: string | null;
+  disputed: boolean;
+  createdAt: string;
+  inspector: { id: string; name: string; email: string } | null;
+}
+
+export const quality = {
+  getForPassport: (passportId: string) =>
+    request<QualityReportSummary[]>(`/api/v1/quality/reports/passport/${passportId}`),
+
+  getReport: (id: string) =>
+    request<QualityReportSummary>(`/api/v1/quality/reports/${id}`),
+
+  myReports: (token: string) =>
+    request<QualityReportSummary[]>('/api/v1/quality/reports/mine', { token }),
+
+  submit: (data: {
+    passportId: string;
+    structuralScore?: number;
+    aestheticScore?: number;
+    environmentalScore?: number;
+    overallGrade?: 'A' | 'B' | 'C' | 'D';
+    reportNotes?: string;
+    photoUrls?: string[];
+  }, token: string) =>
+    request<QualityReportSummary>('/api/v1/quality/reports', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  dispute: (reportId: string, token: string) =>
+    request<QualityReportSummary>(`/api/v1/quality/reports/${reportId}/dispute`, {
+      method: 'POST',
+      token,
+    }),
+};
+
 export const passports = {
   list: (params: URLSearchParams, token: string) =>
     request<PassportListResponse>(`/api/v1/passports?${params.toString()}`, { token }),

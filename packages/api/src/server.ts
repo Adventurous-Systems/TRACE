@@ -56,6 +56,7 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/api/v1/auth' });
   await app.register(passportRoutes, { prefix: '/api/v1/passports' });
   await app.register(marketplaceRoutes, { prefix: '/api/v1/marketplace' });
+  await app.register(qualityRoutes, { prefix: '/api/v1/quality' });
 
   return app;
 }

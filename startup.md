@@ -69,6 +69,8 @@ docker compose up -d
 | Listings management   | http://localhost:3000/listings           | Hub staff+   |
 | Create listing        | http://localhost:3000/listings/new       | Hub staff+   |
 | Orders / transactions | http://localhost:3000/transactions       | Any role     |
+| Quality reports       | http://localhost:3000/quality            | Inspector+   |
+| Submit inspection     | http://localhost:3000/quality/new        | Inspector+   |
 | QR scanner            | http://localhost:3000/scan               | Any role     |
 | API health check      | http://localhost:3001/health             | Public       |
 
@@ -81,3 +83,5 @@ docker compose up -d
 3. Check `/marketplace` (public) to see it appear
 4. Log out → log in as **Buyer** → `/marketplace` → open a listing → make offer
 5. Log back in as **Hub Staff** → `/transactions` → confirm delivery
+6. Log in as **Inspector** → `/quality/new?passportId=<id>` → submit quality report
+7. View passport detail page → see quality reports section with grade badges

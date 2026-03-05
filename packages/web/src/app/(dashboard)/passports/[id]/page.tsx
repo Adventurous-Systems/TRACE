@@ -7,21 +7,34 @@ import DashboardLayout from '@/components/DashboardLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { passports, type PassportDetail } from '@/lib/api-client';
+import { passports, quality, type PassportDetail, type QualityReportSummary } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
+
+const GRADE_COLORS: Record<string, string> = {
+  A: 'bg-green-100 text-green-800',
+  B: 'bg-blue-100 text-blue-800',
+  C: 'bg-yellow-100 text-yellow-800',
+  D: 'bg-red-100 text-red-800',
+};
 
 export default function PassportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [passport, setPassport] = useState<PassportDetail | null>(null);
+  const [qualityReports, setQualityReports] = useState<QualityReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getToken();
-    passports
-      .get(id, token ?? undefined)
-      .then(setPassport)
+    Promise.all([
+      passports.get(id, token ?? undefined),
+      quality.getForPassport(id).catch(() => []),
+    ])
+      .then(([p, qr]) => {
+        setPassport(p);
+        setQualityReports(qr as QualityReportSummary[]);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -173,6 +186,64 @@ export default function PassportDetailPage() {
                 </div>
               ))}
             </dl>
+          </CardContent>
+        </Card>
+
+        {/* Quality reports */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Quality inspections</CardTitle>
+              <Link href={`/quality/new?passportId=${id}`}>
+                <button className="text-xs text-brand-600 hover:underline">+ Add inspection</button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {qualityReports.length === 0 ? (
+              <p className="text-sm text-gray-500">No inspections submitted yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {qualityReports.map((r) => (
+                  <div key={r.id} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-3">
+                      {r.overallGrade && (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-sm font-bold ${GRADE_COLORS[r.overallGrade] ?? 'bg-gray-100'}`}>
+                          Grade {r.overallGrade}
+                        </span>
+                      )}
+                      {r.disputed && (
+                        <Badge variant="destructive" className="text-xs">Disputed</Badge>
+                      )}
+                      {r.blockchainTxHash && (
+                        <span className="text-xs text-green-600 font-medium">✓ Anchored</span>
+                      )}
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    {(r.structuralScore != null || r.aestheticScore != null || r.environmentalScore != null) && (
+                      <div className="flex gap-4 text-xs text-gray-600">
+                        {r.structuralScore != null && <span>Structural: <strong>{r.structuralScore}/10</strong></span>}
+                        {r.aestheticScore != null && <span>Aesthetic: <strong>{r.aestheticScore}/10</strong></span>}
+                        {r.environmentalScore != null && <span>Environmental: <strong>{r.environmentalScore}/10</strong></span>}
+                      </div>
+                    )}
+
+                    {r.reportNotes && (
+                      <p className="text-sm text-gray-600">{r.reportNotes}</p>
+                    )}
+
+                    {r.inspector && (
+                      <p className="text-xs text-gray-400">
+                        Inspector: {r.inspector.name}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

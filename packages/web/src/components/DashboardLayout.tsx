@@ -36,6 +36,7 @@ export default function DashboardLayout({ children }: Props) {
     { href: '/passports', label: 'Passports' },
     { href: '/listings', label: 'Listings' },
     { href: '/transactions', label: 'Orders' },
+    { href: '/quality', label: 'Quality' },
     { href: '/scan', label: 'Scan QR' },
   ];
 
