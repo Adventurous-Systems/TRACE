@@ -24,6 +24,8 @@ export type { OrganisationType, OrganisationBranding, Organisation } from './typ
 
 export type { QualityGrade, QualityReport } from './types/quality.js';
 
+export type { ProposalStatus, GovernanceProposal, GovernanceVote } from './types/governance.js';
+
 // Constants
 export {
   MATERIAL_CATEGORIES,
@@ -98,6 +100,17 @@ export type {
   CreateQualityReportInput,
   QualityQueryInput,
 } from './validators/quality.schema.js';
+
+export {
+  CreateProposalSchema,
+  CastVoteSchema,
+  GovernanceQuerySchema,
+} from './validators/governance.schema.js';
+export type {
+  CreateProposalInput,
+  CastVoteInput,
+  GovernanceQueryInput,
+} from './validators/governance.schema.js';
 
 // Logger
 export { createLogger, logger } from './logger.js';
