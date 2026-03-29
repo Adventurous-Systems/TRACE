@@ -1,0 +1,21 @@
+FROM node:20-alpine AS builder
+
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+RUN npm install -g pnpm turbo
+
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter="@trace/api..." build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+# Only need production dependencies, but for a turborepo it's easier to copy the built app or just install prod deps.
+# Since pnpm workspace dependencies are linked, running a full install without dev dependencies is standard.
+RUN npm install -g pnpm
+COPY --from=builder /app /app
+WORKDIR /app/packages/api
+
+CMD ["npx", "tsx", "--env-file=../../.env", "src/index.ts"]

@@ -5,9 +5,15 @@ export const metadata: Metadata = {
   title: 'TRACE — Material Passport Platform',
   description: 'Blockchain-enabled digital marketplace for construction material reuse',
   manifest: '/manifest.json',
-  themeColor: '#16a34a',
-  viewport: 'width=device-width, initial-scale=1',
 };
+
+export const viewport = {
+  themeColor: '#16a34a',
+  width: 'device-width',
+  initialScale: 1,
+};
+
+export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
