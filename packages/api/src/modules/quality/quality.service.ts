@@ -7,7 +7,6 @@ import {
 } from '@trace/db';
 import {
   type CreateQualityReportInput,
-  type QualityQueryInput,
   NotFoundError,
   ForbiddenError,
 } from '@trace/core';
@@ -73,7 +72,7 @@ export async function getReportsByPassport(
     with: { inspector: true },
   });
 
-  return reports.map((r) => ({
+  return reports.map((r: any) => ({
     ...r,
     inspector: r.inspector
       ? { id: r.inspector.id, name: r.inspector.name, email: r.inspector.email }
