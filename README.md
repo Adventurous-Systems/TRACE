@@ -2,7 +2,7 @@
 
 [TRACE](https://trace.construction/) is a blockchain-enabled digital marketplace for construction material reuse hubs. It issues EU DPP-compliant material passports, anchors integrity proofs on VeChainThor, and governs the system through Ostrom commons principles via smart contracts.
 
-**Read [`SPEC.md`](./SPEC.md)** for the full specification. **Read [`startup.md`](./startup.md)** for local dev setup. **Read [`GIT_WORKFLOW.md`](./GIT_WORKFLOW.md)** for the staging-to-production release process.
+**Read [`SPEC.md`](./SPEC.md)** for the full specification. **Read [`startup.md`](./startup.md)** for local dev setup. **Read [`GIT_WORKFLOW.md`](./GIT_WORKFLOW.md)** for the staging-to-production release process. **Read [`docs/AccessManagement.md`](./docs/AccessManagement.md)** for the public signup, seller-access, and admin review flow.
 
 ---
 
@@ -85,6 +85,9 @@ packages/sdk/         → TypeScript SDK for external consumers
 - `GET/POST /api/v1/marketplace/listings` — Public browse + hub listing management
 - `POST /api/v1/marketplace/offers` — Buyer offer submission
 - `GET/PATCH /api/v1/marketplace/transactions` — Order lifecycle management
+- `POST /api/v1/auth/register` — Public buyer signup
+- `POST /api/v1/access-requests` — Buyer request for seller or beta access
+- `GET/PATCH /api/v1/access-requests` — Platform-admin review and management flow
 - Background worker: BullMQ → VeChain anchor on passport creation
 
 **Frontend (Next.js — port 3000)**
@@ -93,7 +96,10 @@ packages/sdk/         → TypeScript SDK for external consumers
 - `/passport/[id]` — Public passport view (QR scan landing)
 - `/scan` — Camera QR scanner
 - `/login` — JWT authentication
+- `/register` — Public buyer signup
+- `/access-request` — Buyer request flow for seller or beta access
 - `/dashboard` — Hub staff overview
+- `/admin/access-requests` — Platform admin access management
 - `/passports` — Inventory management
 - `/passports/new` — 5-step material registration wizard
 - `/passports/[id]` — Passport detail with blockchain status
@@ -142,6 +148,10 @@ pnpm --filter @trace/web dev   # http://localhost:3000
 
 - `/register` creates a public `buyer` account only.
 - Buyers can submit `/access-request` to request `hub_staff` or `hub_admin` access.
+- `platform_admin` reviews requests at `/admin/access-requests`.
+- Pending requests can be edited, approved, or rejected without hard delete.
+- Approved users can be reassigned between `hub_staff` and `hub_admin`, moved between organisations, or revoked back to `buyer`.
+- Revoked or rejected buyers can start the request flow again from the beginning.
 - Elevated roles are approved internally and assigned with an organisation; they are not self-service.
 
 ---
