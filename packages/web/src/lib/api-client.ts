@@ -212,7 +212,8 @@ export const accessRequests = {
     id: string,
     data: {
       role: 'hub_staff' | 'hub_admin';
-      organisationId: string;
+      organisationId?: string;
+      organisationName?: string;
       reviewNotes?: string;
     },
     token: string,
@@ -232,6 +233,52 @@ export const accessRequests = {
   ) =>
     request<AccessRequest>(`/api/v1/access-requests/${id}/reject`, {
       method: 'POST',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updatePending: (
+    id: string,
+    data: {
+      requestedRole: 'hub_staff' | 'hub_admin';
+      organisationName: string;
+      notes?: string;
+      reviewNotes?: string;
+    },
+    token: string,
+  ) =>
+    request<AccessRequestReview>(`/api/v1/access-requests/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateApprovedUser: (
+    id: string,
+    data: {
+      role: 'buyer' | 'hub_staff' | 'hub_admin';
+      organisationId?: string;
+      organisationName?: string;
+      reviewNotes?: string;
+    },
+    token: string,
+  ) =>
+    request<AccessRequestReview>(`/api/v1/access-requests/${id}/approved-user`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateOrganisation: (
+    id: string,
+    data: {
+      name: string;
+      verified: boolean;
+    },
+    token: string,
+  ) =>
+    request<AccessRequestOrganisation>(`/api/v1/access-requests/organisations/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(data),
       token,
     }),

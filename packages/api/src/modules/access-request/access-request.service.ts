@@ -8,7 +8,80 @@ import {
   type ApproveAccessRequestInput,
   type CreateAccessRequestInput,
   type RejectAccessRequestInput,
+  type UpdateAccessRequestOrganisationInput,
+  type UpdateApprovedUserAccessInput,
+  type UpdatePendingAccessRequestInput,
 } from '@trace/core';
+
+function slugifyOrganisationName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+    .slice(0, 63) || 'organisation';
+}
+
+async function resolveOrganisationForApproval(
+  input: { organisationId?: string | undefined; organisationName?: string | undefined },
+  fallbackName?: string | null,
+) {
+  if (input.organisationId) {
+    const organisation = await db.query.organisations.findFirst({
+      where: eq(organisations.id, input.organisationId),
+    });
+
+    if (!organisation) {
+      throw new NotFoundError('Organisation', input.organisationId);
+    }
+
+    return organisation;
+  }
+
+  const requestedName = input.organisationName?.trim() || fallbackName?.trim();
+  if (!requestedName) {
+    throw new NotFoundError('Organisation', 'missing organisation name');
+  }
+
+  const existingByName = await db.query.organisations.findFirst({
+    where: eq(organisations.name, requestedName),
+  });
+
+  if (existingByName) {
+    return existingByName;
+  }
+
+  const baseSlug = slugifyOrganisationName(requestedName);
+  let slug = baseSlug;
+  let suffix = 2;
+
+  while (true) {
+    const existingBySlug = await db.query.organisations.findFirst({
+      where: eq(organisations.slug, slug),
+    });
+
+    if (!existingBySlug) {
+      break;
+    }
+
+    slug = `${baseSlug.slice(0, Math.max(1, 63 - String(suffix).length - 1))}-${suffix}`;
+    suffix += 1;
+  }
+
+  const [createdOrganisation] = await db
+    .insert(organisations)
+    .values({
+      name: requestedName,
+      type: 'hub',
+      slug,
+      verified: false,
+      branding: {},
+    })
+    .returning();
+
+  return createdOrganisation!;
+}
 
 function sanitizeUser(user: {
   id: string;
@@ -140,6 +213,51 @@ export async function listAccessRequestOrganisations() {
   });
 }
 
+export async function updatePendingAccessRequest(
+  requestId: string,
+  input: UpdatePendingAccessRequestInput,
+) {
+  const request = await db.query.betaAccessRequests.findFirst({
+    where: eq(betaAccessRequests.id, requestId),
+    with: {
+      user: true,
+      targetOrganisation: true,
+      reviewer: true,
+    },
+  });
+
+  if (!request) {
+    throw new NotFoundError('Access request', requestId);
+  }
+
+  if (request.status !== 'pending') {
+    throw new ConflictError('Only pending access requests can be edited');
+  }
+
+  const [updated] = await db
+    .update(betaAccessRequests)
+    .set({
+      requestedRole: input.requestedRole,
+      organisationName: input.organisationName,
+      notes: input.notes ?? null,
+      reviewNotes: input.reviewNotes ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(betaAccessRequests.id, requestId))
+    .returning();
+
+  const hydrated = await db.query.betaAccessRequests.findFirst({
+    where: eq(betaAccessRequests.id, updated!.id),
+    with: {
+      user: true,
+      targetOrganisation: true,
+      reviewer: true,
+    },
+  });
+
+  return hydrated ? serializeAccessRequestWithRelations(hydrated) : null;
+}
+
 export async function approveAccessRequest(
   requestId: string,
   reviewerId: string,
@@ -157,20 +275,14 @@ export async function approveAccessRequest(
     throw new ConflictError('Only pending access requests can be approved');
   }
 
-  const organisation = await db.query.organisations.findFirst({
-    where: eq(organisations.id, input.organisationId),
-  });
-
-  if (!organisation) {
-    throw new NotFoundError('Organisation', input.organisationId);
-  }
+  const organisation = await resolveOrganisationForApproval(input, request.organisationName);
 
   await db.transaction(async (tx) => {
     await tx
       .update(users)
       .set({
         role: input.role,
-        organisationId: input.organisationId,
+        organisationId: organisation.id,
       })
       .where(eq(users.id, request.userId));
 
@@ -180,7 +292,7 @@ export async function approveAccessRequest(
         status: 'approved',
         reviewedBy: reviewerId,
         reviewedAt: new Date(),
-        targetOrganisationId: input.organisationId,
+        targetOrganisationId: organisation.id,
         reviewNotes: input.reviewNotes ?? null,
         updatedAt: new Date(),
       })
@@ -196,6 +308,86 @@ export async function approveAccessRequest(
     },
   });
   return updated ? serializeAccessRequestWithRelations(updated) : null;
+}
+
+export async function updateApprovedUserAccess(
+  requestId: string,
+  reviewerId: string,
+  input: UpdateApprovedUserAccessInput,
+) {
+  const request = await db.query.betaAccessRequests.findFirst({
+    where: eq(betaAccessRequests.id, requestId),
+  });
+
+  if (!request) {
+    throw new NotFoundError('Access request', requestId);
+  }
+
+  if (request.status !== 'approved') {
+    throw new ConflictError('Only approved access requests can be updated');
+  }
+
+  const nextOrganisation =
+    input.role === 'buyer'
+      ? null
+      : await resolveOrganisationForApproval(input, request.organisationName);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        role: input.role,
+        organisationId: nextOrganisation?.id ?? null,
+      })
+      .where(eq(users.id, request.userId));
+
+    await tx
+      .update(betaAccessRequests)
+      .set({
+        targetOrganisationId: nextOrganisation?.id ?? null,
+        reviewNotes: input.reviewNotes ?? request.reviewNotes,
+        reviewedBy: reviewerId,
+        reviewedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(betaAccessRequests.id, requestId));
+  });
+
+  const updated = await db.query.betaAccessRequests.findFirst({
+    where: eq(betaAccessRequests.id, requestId),
+    with: {
+      user: true,
+      targetOrganisation: true,
+      reviewer: true,
+    },
+  });
+
+  return updated ? serializeAccessRequestWithRelations(updated) : null;
+}
+
+export async function updateAccessRequestOrganisation(
+  organisationId: string,
+  input: UpdateAccessRequestOrganisationInput,
+) {
+  const organisation = await db.query.organisations.findFirst({
+    where: eq(organisations.id, organisationId),
+  });
+
+  if (!organisation) {
+    throw new NotFoundError('Organisation', organisationId);
+  }
+
+  const [updated] = await db
+    .update(organisations)
+    .set({
+      name: input.name,
+      verified: input.verified,
+      updatedAt: new Date(),
+    })
+    .where(eq(organisations.id, organisationId))
+    .returning();
+
+  return updated!;
 }
 
 export async function rejectAccessRequest(

@@ -1,26 +1,42 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
+  ApiError,
   accessRequests,
   type AccessRequestOrganisation,
   type AccessRequestReview,
 } from '@/lib/api-client';
-import { getToken, getUser } from '@/lib/auth';
+import { getSession, type StoredUser } from '@/lib/auth';
 
-type StatusFilter = 'pending' | 'approved' | 'rejected';
+type AdminView = 'pending' | 'approved' | 'organisations';
+type PendingStatusFilter = 'pending' | 'rejected';
 
-interface ReviewDraft {
-  role: 'hub_staff' | 'hub_admin';
-  organisationId: string;
+interface PendingDraft {
+  requestedRole: 'hub_staff' | 'hub_admin';
+  organisationName: string;
+  notes: string;
   reviewNotes: string;
 }
 
-const FILTERS: StatusFilter[] = ['pending', 'approved', 'rejected'];
+interface ApprovedDraft {
+  role: 'buyer' | 'hub_staff' | 'hub_admin';
+  organisationId: string;
+  organisationName: string;
+  reviewNotes: string;
+}
+
+interface OrganisationDraft {
+  name: string;
+  verified: boolean;
+}
+
+const VIEW_OPTIONS: AdminView[] = ['pending', 'approved', 'organisations'];
+const PENDING_FILTERS: PendingStatusFilter[] = ['pending', 'rejected'];
 
 function formatRole(role: string) {
   return role.replace(/_/g, ' ');
@@ -31,19 +47,72 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleString();
 }
 
+function getLoadErrorMessage(err: unknown) {
+  if (err instanceof ApiError) {
+    if (err.status === 429) {
+      return 'Too many requests hit the admin API. Please wait a moment, then retry.';
+    }
+    if (err.status === 401 || err.status === 403) {
+      return 'Your session no longer has access to this page. Please sign in again.';
+    }
+  }
+  return err instanceof Error ? err.message : 'Failed to load access management data';
+}
+
 export default function AdminAccessRequestsPage() {
-  const user = getUser();
-  const token = getToken();
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [view, setView] = useState<AdminView>('pending');
+  const [pendingFilter, setPendingFilter] = useState<PendingStatusFilter>('pending');
   const [requests, setRequests] = useState<AccessRequestReview[]>([]);
   const [organisations, setOrganisations] = useState<AccessRequestOrganisation[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
+  const [pendingDrafts, setPendingDrafts] = useState<Record<string, PendingDraft>>({});
+  const [approvedDrafts, setApprovedDrafts] = useState<Record<string, ApprovedDraft>>({});
+  const [organisationDrafts, setOrganisationDrafts] = useState<Record<string, OrganisationDraft>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [loadVersion, setLoadVersion] = useState(0);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
-    if (!user || user.role !== 'platform_admin') {
+    const session = getSession();
+    setToken(session.token);
+    setUser(session.user);
+    setSessionReady(true);
+  }, []);
+
+  const loadData = useCallback(async () => {
+    if (!token || !user || user.role !== 'platform_admin' || loadingRef.current) {
+      return;
+    }
+
+    loadingRef.current = true;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const organisationData = await accessRequests.organisations(token);
+      setOrganisations(organisationData);
+
+      if (view === 'organisations') {
+        setRequests([]);
+      } else {
+        const status = view === 'approved' ? 'approved' : pendingFilter;
+        const requestData = await accessRequests.list(token, status);
+        setRequests(requestData);
+      }
+    } catch (err) {
+      setError(getLoadErrorMessage(err));
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, [pendingFilter, token, user, view]);
+
+  useEffect(() => {
+    if (!sessionReady) {
       return;
     }
 
@@ -53,51 +122,34 @@ export default function AdminAccessRequestsPage() {
       return;
     }
 
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    Promise.all([
-      accessRequests.list(token, statusFilter),
-      accessRequests.organisations(token),
-    ])
-      .then(([requestData, organisationData]) => {
-        if (cancelled) return;
-        setRequests(requestData);
-        setOrganisations(organisationData);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load access requests');
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [statusFilter, token, user]);
-
-  useEffect(() => {
-    if (requests.length === 0 || organisations.length === 0) {
+    if (!user) {
+      setLoading(false);
       return;
     }
 
-    setDrafts((current) => {
+    if (user.role !== 'platform_admin') {
+      setLoading(false);
+      return;
+    }
+
+    void loadData();
+  }, [loadData, loadVersion, sessionReady, token, user]);
+
+  useEffect(() => {
+    if (requests.length === 0) {
+      return;
+    }
+
+    setPendingDrafts((current) => {
       const next = { ...current };
       let changed = false;
 
       for (const request of requests) {
-        if (next[request.id]) continue;
+        if (request.status !== 'pending' || next[request.id]) continue;
         next[request.id] = {
-          role: request.requestedRole,
-          organisationId:
-            request.targetOrganisationId ??
-            organisations.find((org) => org.name === request.organisationName)?.id ??
-            organisations[0]!.id,
+          requestedRole: request.requestedRole,
+          organisationName: request.organisationName ?? '',
+          notes: request.notes ?? '',
           reviewNotes: request.reviewNotes ?? '',
         };
         changed = true;
@@ -105,90 +157,273 @@ export default function AdminAccessRequestsPage() {
 
       return changed ? next : current;
     });
-  }, [organisations, requests]);
 
-  const requestCountLabel = useMemo(() => {
-    if (loading) return 'Loading requests...';
-    return `${requests.length} ${statusFilter} request${requests.length === 1 ? '' : 's'}`;
-  }, [loading, requests.length, statusFilter]);
+    setApprovedDrafts((current) => {
+      const next = { ...current };
+      let changed = false;
 
-  function updateDraft(id: string, updates: Partial<ReviewDraft>) {
-    setDrafts((current) => ({
+      for (const request of requests) {
+        if (request.status !== 'approved' || next[request.id]) continue;
+        next[request.id] = {
+          role:
+            request.user?.role === 'buyer' || request.user?.role === 'hub_staff' || request.user?.role === 'hub_admin'
+              ? request.user.role
+              : 'hub_staff',
+          organisationId: request.targetOrganisationId ?? request.user?.organisationId ?? '',
+          organisationName: request.targetOrganisation?.name ?? request.organisationName ?? '',
+          reviewNotes: request.reviewNotes ?? '',
+        };
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, [requests]);
+
+  useEffect(() => {
+    if (organisations.length === 0) {
+      return;
+    }
+
+    setOrganisationDrafts((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      for (const organisation of organisations) {
+        if (next[organisation.id]) continue;
+        next[organisation.id] = {
+          name: organisation.name,
+          verified: organisation.verified,
+        };
+        changed = true;
+      }
+
+      return changed ? next : current;
+    });
+  }, [organisations]);
+
+  const sectionDescription = useMemo(() => {
+    if (view === 'pending') {
+      return `${requests.length} ${pendingFilter} request${requests.length === 1 ? '' : 's'}`;
+    }
+    if (view === 'approved') {
+      return `${requests.length} approved access record${requests.length === 1 ? '' : 's'}`;
+    }
+    return `${organisations.length} organisation${organisations.length === 1 ? '' : 's'}`;
+  }, [organisations.length, pendingFilter, requests.length, view]);
+
+  function refreshData() {
+    setLoadVersion((current) => current + 1);
+  }
+
+  function updatePendingDraft(id: string, updates: Partial<PendingDraft>) {
+    setPendingDrafts((current) => ({
       ...current,
       [id]: {
-        role: current[id]?.role ?? 'hub_staff',
-        organisationId: current[id]?.organisationId ?? organisations[0]?.id ?? '',
+        requestedRole: current[id]?.requestedRole ?? 'hub_staff',
+        organisationName: current[id]?.organisationName ?? '',
+        notes: current[id]?.notes ?? '',
         reviewNotes: current[id]?.reviewNotes ?? '',
         ...updates,
       },
     }));
   }
 
-  async function refreshCurrentFilter() {
+  function updateApprovedDraft(id: string, updates: Partial<ApprovedDraft>) {
+    setApprovedDrafts((current) => ({
+      ...current,
+      [id]: {
+        role: current[id]?.role ?? 'hub_staff',
+        organisationId: current[id]?.organisationId ?? '',
+        organisationName: current[id]?.organisationName ?? '',
+        reviewNotes: current[id]?.reviewNotes ?? '',
+        ...updates,
+      },
+    }));
+  }
+
+  function updateOrganisationDraft(id: string, updates: Partial<OrganisationDraft>) {
+    setOrganisationDrafts((current) => ({
+      ...current,
+      [id]: {
+        name: current[id]?.name ?? '',
+        verified: current[id]?.verified ?? false,
+        ...updates,
+      },
+    }));
+  }
+
+  async function handleSavePending(requestId: string) {
     if (!token) return;
-    const requestData = await accessRequests.list(token, statusFilter);
-    setRequests(requestData);
+    const draft = pendingDrafts[requestId];
+    if (!draft?.organisationName.trim()) {
+      setError('Organisation name is required for pending requests.');
+      return;
+    }
+
+    setBusyKey(`save-pending-${requestId}`);
+    setError(null);
+    try {
+      await accessRequests.updatePending(
+        requestId,
+        {
+          requestedRole: draft.requestedRole,
+          organisationName: draft.organisationName.trim(),
+          notes: draft.notes.trim() || undefined,
+          reviewNotes: draft.reviewNotes.trim() || undefined,
+        },
+        token,
+      );
+      refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update pending request');
+    } finally {
+      setBusyKey(null);
+    }
   }
 
   async function handleApprove(requestId: string) {
     if (!token) return;
-    const draft = drafts[requestId];
-    if (!draft?.organisationId) {
-      setError('Choose an organisation before approving the request.');
+    const draft = pendingDrafts[requestId];
+    if (!draft?.organisationName.trim()) {
+      setError('Choose an existing organisation or enter a new organisation name before approving.');
       return;
     }
 
-    setBusyId(requestId);
+    setBusyKey(`approve-${requestId}`);
     setError(null);
     try {
       await accessRequests.approve(
         requestId,
         {
-          role: draft.role,
-          organisationId: draft.organisationId,
-          reviewNotes: draft.reviewNotes,
+          role: draft.requestedRole,
+          organisationName: draft.organisationName.trim(),
+          reviewNotes: draft.reviewNotes.trim() || undefined,
         },
         token,
       );
-      await refreshCurrentFilter();
+      refreshData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Approval failed');
     } finally {
-      setBusyId(null);
+      setBusyKey(null);
     }
   }
 
   async function handleReject(requestId: string) {
     if (!token) return;
-    const draft = drafts[requestId];
+    const draft = pendingDrafts[requestId];
 
-    setBusyId(requestId);
+    setBusyKey(`reject-${requestId}`);
     setError(null);
     try {
       await accessRequests.reject(
         requestId,
         {
-          reviewNotes: draft?.reviewNotes,
+          reviewNotes: draft?.reviewNotes.trim() || undefined,
         },
         token,
       );
-      await refreshCurrentFilter();
+      refreshData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Rejection failed');
     } finally {
-      setBusyId(null);
+      setBusyKey(null);
+    }
+  }
+
+  async function handleSaveApproved(requestId: string) {
+    if (!token) return;
+    const draft = approvedDrafts[requestId];
+    if (!draft) return;
+
+    if (draft.role !== 'buyer' && !draft.organisationId && !draft.organisationName.trim()) {
+      setError('Approved hub users need an organisation.');
+      return;
+    }
+
+    setBusyKey(`save-approved-${requestId}`);
+    setError(null);
+    try {
+      await accessRequests.updateApprovedUser(
+        requestId,
+        {
+          role: draft.role,
+          organisationId: draft.role === 'buyer' ? undefined : draft.organisationId || undefined,
+          organisationName: draft.role === 'buyer' ? undefined : draft.organisationName.trim() || undefined,
+          reviewNotes: draft.reviewNotes.trim() || undefined,
+        },
+        token,
+      );
+      refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update approved access');
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleRevokeAccess(requestId: string) {
+    if (!token) return;
+    const draft = approvedDrafts[requestId];
+
+    setBusyKey(`revoke-${requestId}`);
+    setError(null);
+    try {
+      await accessRequests.updateApprovedUser(
+        requestId,
+        {
+          role: 'buyer',
+          reviewNotes: draft?.reviewNotes.trim() || 'Access revoked by platform admin',
+        },
+        token,
+      );
+      refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke access');
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleSaveOrganisation(organisationId: string) {
+    if (!token) return;
+    const draft = organisationDrafts[organisationId];
+    if (!draft?.name.trim()) {
+      setError('Organisation name cannot be empty.');
+      return;
+    }
+
+    setBusyKey(`save-organisation-${organisationId}`);
+    setError(null);
+    try {
+      await accessRequests.updateOrganisation(
+        organisationId,
+        {
+          name: draft.name.trim(),
+          verified: draft.verified,
+        },
+        token,
+      );
+      refreshData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update organisation');
+    } finally {
+      setBusyKey(null);
     }
   }
 
   if (!user || user.role !== 'platform_admin') {
+    if (!sessionReady) {
+      return null;
+    }
+
     return (
       <DashboardLayout>
         <Card>
           <CardHeader>
-            <CardTitle>Access requests</CardTitle>
-            <CardDescription>
-              This page is only available to platform administrators.
-            </CardDescription>
+            <CardTitle>Access management</CardTitle>
+            <CardDescription>This page is only available to platform administrators.</CardDescription>
           </CardHeader>
         </Card>
       </DashboardLayout>
@@ -200,29 +435,50 @@ export default function AdminAccessRequestsPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Access requests</h1>
+            <h1 className="text-2xl font-bold">Access management</h1>
             <p className="text-sm text-gray-500">
-              Review beta tester and seller access requests without leaving the dashboard.
+              Manage pending requests, approved hub access, and organisation records.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {FILTERS.map((filter) => (
+            {VIEW_OPTIONS.map((option) => (
               <Button
-                key={filter}
-                variant={statusFilter === filter ? 'default' : 'outline'}
-                className={statusFilter === filter ? 'bg-brand-600 hover:bg-brand-700' : ''}
-                onClick={() => setStatusFilter(filter)}
+                key={option}
+                variant={view === option ? 'default' : 'outline'}
+                className={view === option ? 'bg-brand-600 hover:bg-brand-700' : ''}
+                onClick={() => setView(option)}
               >
-                {formatRole(filter)}
+                {option === 'approved' ? 'Approved access' : option}
               </Button>
             ))}
           </div>
         </div>
 
+        {view === 'pending' && (
+          <div className="flex flex-wrap items-center gap-2">
+            {PENDING_FILTERS.map((filter) => (
+              <Button
+                key={filter}
+                variant={pendingFilter === filter ? 'default' : 'outline'}
+                className={pendingFilter === filter ? 'bg-brand-600 hover:bg-brand-700' : ''}
+                onClick={() => setPendingFilter(filter)}
+              >
+                {formatRole(filter)}
+              </Button>
+            ))}
+          </div>
+        )}
+
         <Card>
           <CardHeader>
-            <CardTitle>Queue overview</CardTitle>
-            <CardDescription>{requestCountLabel}</CardDescription>
+            <CardTitle>
+              {view === 'pending'
+                ? 'Pending requests'
+                : view === 'approved'
+                  ? 'Approved access'
+                  : 'Organisations'}
+            </CardTitle>
+            <CardDescription>{loading ? 'Loading...' : sectionDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
@@ -230,16 +486,76 @@ export default function AdminAccessRequestsPage() {
             )}
 
             {loading ? (
-              <div className="text-sm text-gray-400">Loading access requests...</div>
+              <div className="text-sm text-gray-400">Loading access management data...</div>
+            ) : error && requests.length === 0 && organisations.length === 0 ? (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-500">The access-management data could not be loaded.</div>
+                <Button variant="outline" onClick={refreshData}>
+                  Retry
+                </Button>
+              </div>
+            ) : view === 'organisations' ? (
+              organisations.length === 0 ? (
+                <div className="text-sm text-gray-500">No organisations available.</div>
+              ) : (
+                <div className="space-y-4">
+                  {organisations.map((organisation) => {
+                    const draft = organisationDrafts[organisation.id];
+                    const isBusy = busyKey === `save-organisation-${organisation.id}`;
+
+                    return (
+                      <div key={organisation.id} className="rounded-lg border bg-white p-4 space-y-4">
+                        <div className="flex flex-col gap-1">
+                          <p className="font-semibold">{organisation.name}</p>
+                          <p className="text-xs text-gray-500">
+                            Slug: {organisation.slug} · Type: {organisation.type}
+                          </p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label htmlFor={`${organisation.id}-name`}>Organisation name</Label>
+                            <input
+                              id={`${organisation.id}-name`}
+                              value={draft?.name ?? organisation.name}
+                              onChange={(event) =>
+                                updateOrganisationDraft(organisation.id, { name: event.target.value })
+                              }
+                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <label className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={draft?.verified ?? organisation.verified}
+                              onChange={(event) =>
+                                updateOrganisationDraft(organisation.id, { verified: event.target.checked })
+                              }
+                            />
+                            Verified organisation
+                          </label>
+                        </div>
+                        <Button
+                          className="bg-brand-600 hover:bg-brand-700"
+                          disabled={isBusy}
+                          onClick={() => handleSaveOrganisation(organisation.id)}
+                        >
+                          {isBusy ? 'Saving...' : 'Update organisation'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             ) : requests.length === 0 ? (
               <div className="text-sm text-gray-500">
-                No {statusFilter} access requests right now.
+                No {view === 'approved' ? 'approved access records' : pendingFilter + ' requests'} right now.
               </div>
-            ) : (
+            ) : view === 'approved' ? (
               <div className="space-y-4">
                 {requests.map((request) => {
-                  const draft = drafts[request.id];
-                  const isBusy = busyId === request.id;
+                  const draft = approvedDrafts[request.id];
+                  const saveBusy = busyKey === `save-approved-${request.id}`;
+                  const revokeBusy = busyKey === `revoke-${request.id}`;
 
                   return (
                     <div key={request.id} className="rounded-lg border bg-white p-4 space-y-4">
@@ -252,14 +568,128 @@ export default function AdminAccessRequestsPage() {
                             </span>
                           </p>
                           <p className="text-sm text-gray-600">
-                            Requested {formatRole(request.requestedRole)} access for{' '}
-                            <span className="font-medium">
-                              {request.organisationName || 'unspecified organisation'}
+                            Current access: {request.user?.role ? formatRole(request.user.role) : 'unknown'} ·{' '}
+                            {request.targetOrganisation?.name || 'no organisation'}
+                          </p>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          <p>Approved: {formatDate(request.reviewedAt)}</p>
+                          <p>Updated: {formatDate(request.updatedAt)}</p>
+                        </div>
+                      </div>
+                      <div className="grid gap-4 lg:grid-cols-3">
+                        <div className="space-y-1">
+                          <Label htmlFor={`${request.id}-approved-role`}>Role</Label>
+                          <select
+                            id={`${request.id}-approved-role`}
+                            value={draft?.role ?? 'hub_staff'}
+                            onChange={(event) =>
+                              updateApprovedDraft(request.id, {
+                                role: event.target.value as 'buyer' | 'hub_staff' | 'hub_admin',
+                              })
+                            }
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          >
+                            <option value="hub_staff">Hub staff</option>
+                            <option value="hub_admin">Hub admin</option>
+                            <option value="buyer">Buyer</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`${request.id}-approved-organisation`}>Organisation</Label>
+                          <select
+                            id={`${request.id}-approved-organisation`}
+                            value={draft?.organisationId ?? ''}
+                            disabled={draft?.role === 'buyer'}
+                            onChange={(event) =>
+                              updateApprovedDraft(request.id, {
+                                organisationId: event.target.value,
+                                organisationName:
+                                  organisations.find((organisation) => organisation.id === event.target.value)?.name ??
+                                  draft?.organisationName ??
+                                  '',
+                              })
+                            }
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-gray-100"
+                          >
+                            <option value="">Create or use custom organisation name</option>
+                            {organisations.map((organisation) => (
+                              <option key={organisation.id} value={organisation.id}>
+                                {organisation.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`${request.id}-approved-organisation-name`}>Custom organisation name</Label>
+                          <input
+                            id={`${request.id}-approved-organisation-name`}
+                            value={draft?.organisationName ?? ''}
+                            disabled={draft?.role === 'buyer'}
+                            onChange={(event) =>
+                              updateApprovedDraft(request.id, {
+                                organisationId: '',
+                                organisationName: event.target.value,
+                              })
+                            }
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-gray-100"
+                          />
+                        </div>
+                        <div className="space-y-1 lg:col-span-3">
+                          <Label htmlFor={`${request.id}-approved-notes`}>Review notes</Label>
+                          <textarea
+                            id={`${request.id}-approved-notes`}
+                            rows={3}
+                            value={draft?.reviewNotes ?? ''}
+                            onChange={(event) =>
+                              updateApprovedDraft(request.id, { reviewNotes: event.target.value })
+                            }
+                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2 lg:col-span-3">
+                          <Button
+                            className="bg-brand-600 hover:bg-brand-700"
+                            disabled={saveBusy || revokeBusy}
+                            onClick={() => handleSaveApproved(request.id)}
+                          >
+                            {saveBusy ? 'Saving...' : 'Update access'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            disabled={saveBusy || revokeBusy}
+                            onClick={() => handleRevokeAccess(request.id)}
+                          >
+                            {revokeBusy ? 'Saving...' : 'Revoke access'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {requests.map((request) => {
+                  const draft = pendingDrafts[request.id];
+                  const saveBusy = busyKey === `save-pending-${request.id}`;
+                  const approveBusy = busyKey === `approve-${request.id}`;
+                  const rejectBusy = busyKey === `reject-${request.id}`;
+
+                  return (
+                    <div key={request.id} className="rounded-lg border bg-white p-4 space-y-4">
+                      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-1">
+                          <p className="font-semibold">
+                            {request.user?.name || 'Unknown user'}{' '}
+                            <span className="font-normal text-gray-500">
+                              ({request.user?.email || request.userId})
                             </span>
                           </p>
-                          {request.notes && (
-                            <p className="text-sm text-gray-500">{request.notes}</p>
-                          )}
+                          <p className="text-sm text-gray-600">
+                            Requested {formatRole(request.requestedRole)} for{' '}
+                            <span className="font-medium">{request.organisationName || 'unspecified organisation'}</span>
+                          </p>
                         </div>
                         <div className="text-sm text-gray-500">
                           <p>Status: <span className="font-medium text-gray-800">{request.status}</span></p>
@@ -269,15 +699,15 @@ export default function AdminAccessRequestsPage() {
                       </div>
 
                       {request.status === 'pending' ? (
-                        <div className="grid gap-4 lg:grid-cols-3">
+                        <div className="grid gap-4 lg:grid-cols-2">
                           <div className="space-y-1">
-                            <Label htmlFor={`${request.id}-role`}>Approve as</Label>
+                            <Label htmlFor={`${request.id}-pending-role`}>Requested role</Label>
                             <select
-                              id={`${request.id}-role`}
-                              value={draft?.role ?? request.requestedRole}
+                              id={`${request.id}-pending-role`}
+                              value={draft?.requestedRole ?? 'hub_staff'}
                               onChange={(event) =>
-                                updateDraft(request.id, {
-                                  role: event.target.value as 'hub_staff' | 'hub_admin',
+                                updatePendingDraft(request.id, {
+                                  requestedRole: event.target.value as 'hub_staff' | 'hub_admin',
                                 })
                               }
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -287,62 +717,67 @@ export default function AdminAccessRequestsPage() {
                             </select>
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor={`${request.id}-organisation`}>Organisation</Label>
-                            <select
-                              id={`${request.id}-organisation`}
-                              value={draft?.organisationId ?? ''}
+                            <Label htmlFor={`${request.id}-pending-organisation`}>Organisation name</Label>
+                            <input
+                              id={`${request.id}-pending-organisation`}
+                              value={draft?.organisationName ?? ''}
                               onChange={(event) =>
-                                updateDraft(request.id, { organisationId: event.target.value })
+                                updatePendingDraft(request.id, { organisationName: event.target.value })
                               }
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                            >
-                              {organisations.map((organisation) => (
-                                <option key={organisation.id} value={organisation.id}>
-                                  {organisation.name}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           </div>
-                          <div className="space-y-1 lg:col-span-3">
-                            <Label htmlFor={`${request.id}-notes`}>Review notes</Label>
+                          <div className="space-y-1 lg:col-span-2">
+                            <Label htmlFor={`${request.id}-pending-notes`}>Request notes</Label>
                             <textarea
-                              id={`${request.id}-notes`}
+                              id={`${request.id}-pending-notes`}
+                              rows={3}
+                              value={draft?.notes ?? ''}
+                              onChange={(event) =>
+                                updatePendingDraft(request.id, { notes: event.target.value })
+                              }
+                              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1 lg:col-span-2">
+                            <Label htmlFor={`${request.id}-pending-review-notes`}>Review notes</Label>
+                            <textarea
+                              id={`${request.id}-pending-review-notes`}
                               rows={3}
                               value={draft?.reviewNotes ?? ''}
                               onChange={(event) =>
-                                updateDraft(request.id, { reviewNotes: event.target.value })
+                                updatePendingDraft(request.id, { reviewNotes: event.target.value })
                               }
                               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                              placeholder="Optional internal note for the user or reviewer"
                             />
                           </div>
-                          <div className="flex flex-wrap gap-2 lg:col-span-3">
+                          <div className="flex flex-wrap gap-2 lg:col-span-2">
+                            <Button
+                              variant="outline"
+                              disabled={saveBusy || approveBusy || rejectBusy}
+                              onClick={() => handleSavePending(request.id)}
+                            >
+                              {saveBusy ? 'Saving...' : 'Save changes'}
+                            </Button>
                             <Button
                               className="bg-brand-600 hover:bg-brand-700"
-                              disabled={isBusy}
+                              disabled={saveBusy || approveBusy || rejectBusy}
                               onClick={() => handleApprove(request.id)}
                             >
-                              {isBusy ? 'Saving...' : 'Approve'}
+                              {approveBusy ? 'Saving...' : 'Approve'}
                             </Button>
                             <Button
                               variant="outline"
-                              disabled={isBusy}
+                              disabled={saveBusy || approveBusy || rejectBusy}
                               onClick={() => handleReject(request.id)}
                             >
-                              {isBusy ? 'Saving...' : 'Reject'}
+                              {rejectBusy ? 'Saving...' : 'Reject'}
                             </Button>
                           </div>
                         </div>
                       ) : (
                         <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                          {request.status === 'approved' ? (
-                            <>
-                              Approved as {request.user?.role ? formatRole(request.user.role) : 'updated user'} for{' '}
-                              {request.targetOrganisation?.name || 'the selected organisation'}.
-                            </>
-                          ) : (
-                            <>This request was rejected.</>
-                          )}
+                          This request was rejected.
                           {request.reviewNotes && (
                             <span className="block mt-1 text-gray-500">{request.reviewNotes}</span>
                           )}
