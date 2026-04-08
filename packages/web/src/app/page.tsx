@@ -15,7 +15,7 @@ export default function HomePage() {
           <Link href="/login">
             <Button variant="ghost" size="sm">Sign in</Button>
           </Link>
-          <Link href="/login">
+          <Link href="/register">
             <Button size="sm">Get started</Button>
           </Link>
         </div>
@@ -35,9 +35,9 @@ export default function HomePage() {
           materials, enabling circular economy hubs to buy and sell with trust and compliance.
         </p>
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          <Link href="/login">
+          <Link href="/register">
             <Button size="lg" className="bg-brand-600 hover:bg-brand-700">
-              Register a material
+              Create account
             </Button>
           </Link>
           <Link href="/scan">

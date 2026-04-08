@@ -96,7 +96,6 @@ describe('POST /api/v1/auth/register', () => {
         email: uniqueEmail,
         password: 'SecurePass1!',
         name: 'Test Registrant',
-        role: 'buyer',
       },
     });
 
@@ -116,7 +115,6 @@ describe('POST /api/v1/auth/register', () => {
         email: uniqueEmail,
         password: 'SecurePass1!',
         name: 'Duplicate',
-        role: 'buyer',
       },
     });
 
@@ -134,11 +132,34 @@ describe('POST /api/v1/auth/register', () => {
         email: 'another@example.com',
         password: 'short', // < 8 chars
         name: 'Test',
-        role: 'buyer',
       },
     });
 
     expect(res.statusCode).toBe(400);
+  });
+
+  it('ignores attempted role and organisation assignment during public signup', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/register',
+      payload: {
+        email: `test-public-role-${Date.now()}@example.com`,
+        password: 'SecurePass1!',
+        name: 'Role Escalation Attempt',
+        role: 'platform_admin',
+        organisationId: '550e8400-e29b-41d4-a716-446655440000',
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = res.json<{
+      success: boolean;
+      data: { user: { role: string; organisationId: string | null } };
+    }>();
+
+    expect(body.success).toBe(true);
+    expect(body.data.user.role).toBe('buyer');
+    expect(body.data.user.organisationId).toBeNull();
   });
 });
 

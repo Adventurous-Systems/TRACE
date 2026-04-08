@@ -16,7 +16,8 @@ export async function loginUser(input: LoginInput): Promise<JwtPayload> {
   });
 
   // Constant-time comparison path — always check hash to prevent timing attacks
-  const dummyHash = '$2b$10$invalidhashusedtopreventimingtimingattacks';
+  // Valid bcrypt hash for a known dummy string; keeps compare path constant-time.
+  const dummyHash = '$2b$10$02xnKRdR3biWegV7liWi7.Lwo5N9ozmh/MGhPxCfM/I2x6lmUpJMW';
   const passwordToCheck = user?.passwordHash ?? dummyHash;
   const valid = await bcrypt.compare(input.password, passwordToCheck);
 
@@ -44,8 +45,8 @@ export async function registerUser(input: RegisterInput): Promise<JwtPayload> {
       email: input.email.toLowerCase(),
       passwordHash,
       name: input.name,
-      role: input.role,
-      organisationId: input.organisationId ?? null,
+      role: 'buyer',
+      organisationId: null,
     })
     .returning();
 

@@ -13,14 +13,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { auth } from '@/lib/api-client';
 import { getPostAuthRedirect, saveSession } from '@/lib/auth';
 
-const LoginSchema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(1, 'Password is required'),
-});
+const RegisterSchema = z
+  .object({
+    name: z.string().min(1, 'Name is required'),
+    email: z.string().email('Enter a valid email'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords do not match',
+  });
 
-type LoginForm = z.infer<typeof LoginSchema>;
+type RegisterForm = z.infer<typeof RegisterSchema>;
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -28,21 +35,25 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginForm>({ resolver: zodResolver(LoginSchema) });
+  } = useForm<RegisterForm>({ resolver: zodResolver(RegisterSchema) });
 
-  async function onSubmit(data: LoginForm) {
+  async function onSubmit(data: RegisterForm) {
     setServerError(null);
     try {
-      const result = await auth.login(data.email, data.password);
+      const result = await auth.register({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+      });
       saveSession(result.token, result.user);
       router.push(getPostAuthRedirect(result.user));
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Login failed');
+      setServerError(err instanceof Error ? err.message : 'Registration failed');
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -52,11 +63,24 @@ export default function LoginPage() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>Access TRACE with your email and password</CardDescription>
+            <CardTitle>Create account</CardTitle>
+            <CardDescription>Get started with a buyer account for TRACE marketplace access</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Your name"
+                  autoComplete="name"
+                  {...register('name')}
+                />
+                {errors.name && (
+                  <p className="text-sm text-red-500">{errors.name.message}</p>
+                )}
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -75,11 +99,23 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   {...register('password')}
                 />
                 {errors.password && (
                   <p className="text-sm text-red-500">{errors.password.message}</p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  {...register('confirmPassword')}
+                />
+                {errors.confirmPassword && (
+                  <p className="text-sm text-red-500">{errors.confirmPassword.message}</p>
                 )}
               </div>
               {serverError && (
@@ -88,12 +124,12 @@ export default function LoginPage() {
                 </div>
               )}
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Signing in…' : 'Sign in'}
+                {isSubmitting ? 'Creating account…' : 'Create account'}
               </Button>
               <p className="text-center text-sm text-gray-500">
-                New to TRACE?{' '}
-                <Link href="/register" className="text-brand-600 hover:underline">
-                  Create an account
+                Already have an account?{' '}
+                <Link href="/login" className="text-brand-600 hover:underline">
+                  Sign in
                 </Link>
               </p>
             </form>

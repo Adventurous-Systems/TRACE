@@ -4,6 +4,7 @@ export type { Db } from './client.js';
 export {
   organisations,
   users,
+  betaAccessRequests,
   materialPassports,
   passportEvents,
   listings,
@@ -17,6 +18,8 @@ export type {
   NewOrganisation,
   User,
   NewUser,
+  BetaAccessRequest,
+  NewBetaAccessRequest,
   MaterialPassport,
   NewMaterialPassport,
   PassportEvent,

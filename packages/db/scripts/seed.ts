@@ -44,6 +44,12 @@ async function main() {
 
   const testUsers = [
     {
+      email: 'platform@trace.eco',
+      password: 'Platform1234!',
+      name: 'Platform Admin',
+      role: 'platform_admin' as const,
+    },
+    {
       email: 'admin@stirlingreuse.com',
       password: 'Admin1234!',
       name: 'Hub Admin',
@@ -189,6 +195,7 @@ async function main() {
   await client.end();
   console.log('\nSeed complete.');
   console.log('\nTest credentials:');
+  console.log('  Platform:    platform@trace.eco        / Platform1234!');
   console.log('  Hub Admin:   admin@stirlingreuse.com  / Admin1234!');
   console.log('  Hub Staff:   staff@stirlingreuse.com  / Staff1234!');
   console.log('  Inspector:   inspector@trace.eco       / Inspector1234!');

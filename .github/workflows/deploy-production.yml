@@ -1,0 +1,34 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy production over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.TRACE_PRODUCTION_SSH_HOST }}
+          username: ${{ secrets.TRACE_PRODUCTION_SSH_USER }}
+          key: ${{ secrets.TRACE_PRODUCTION_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/TRACE
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+            docker compose up -d postgres redis thor-solo minio meilisearch
+            docker compose run --rm --build api pnpm --filter @trace/db migrate
+            docker compose up -d --build api web
+            docker compose ps
