@@ -79,6 +79,15 @@ GitHub Actions will deploy `staging` to:
 
 Then perform manual QA in staging.
 
+Recommended staging QA for auth and access work:
+- buyer signup at `/register`
+- buyer request submission at `/access-request`
+- platform admin review at `/admin/access-requests`
+- pending request edit and approval
+- organisation rename and verified toggle
+- approved-user role change, organisation reassignment, and revoke
+- buyer reapply flow after revoke or rejection
+
 ### Phase 3: Promote to production
 
 Only after staging is approved:

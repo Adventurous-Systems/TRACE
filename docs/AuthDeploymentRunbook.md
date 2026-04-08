@@ -1,41 +1,52 @@
-# TRACE Auth Fix Runbook (Staging -> Production)
+# TRACE Auth and Access Deployment Runbook
 
-This runbook implements the auth-flow fix with **same-origin `/api/*` routing** behind nginx and a staged rollout using systemd services.
+This runbook covers the current public auth and access-management rollout for TRACE.
+
+It includes:
+- same-origin `/api/*` routing behind nginx
+- buyer-only public signup
+- buyer access-request flow
+- platform-admin review and management flow
+- staging-first release verification before production
 
 ## Goal
 
 - Login requests from the web app must resolve to API endpoints on the same host.
-- Browser auth traffic must never fall back to `http://localhost:3001` in staging/production.
-- Staging is the release gate; production follows immediately after staging pass.
+- Browser auth traffic must never fall back to `http://localhost:3001` in staging or production.
+- Public signup must create `buyer` accounts only.
+- Buyers must be able to request seller or beta access without choosing their own elevated role.
+- `platform_admin` must be able to review, edit, approve, reassign, and revoke access from `/admin/access-requests`.
+- Revoked buyers must be able to reapply from the beginning.
 
 ## Prerequisites
 
 - SSH access to both servers.
-- Sudo access for `nginx` and `systemctl`.
+- Sudo access for `nginx` and `systemctl` when using a systemd deployment.
+- Docker Compose access for the current TRACE staging and production stacks.
 - Dedicated non-admin test user credentials for staging and production.
-- Updated app build containing the frontend auth client hardening.
+- Platform-admin credentials for admin review validation.
+- Updated app build containing the frontend auth client hardening and access-management pages.
 
 ## Environment Contract
 
 Set or verify:
 
 - API service env:
-  - `WEB_URL=https://trace-staging.adventurous.systems` (staging)
-  - `WEB_URL=https://trace.adventurous.systems` (production)
+  - `WEB_URL=https://trace-staging.adventurous.systems` for staging
+  - `WEB_URL=https://trace.adventurous.systems` for production
 - Web service env:
-  - Leave `NEXT_PUBLIC_API_URL` **unset** for same-origin routing, or
-  - Set `NEXT_PUBLIC_API_URL` to the exact web origin explicitly.
+  - leave `NEXT_PUBLIC_API_URL` unset for same-origin routing, or
+  - set `NEXT_PUBLIC_API_URL` to the exact web origin explicitly
 
-## Nginx Routing (Critical)
+## Nginx Routing
 
 Add a dedicated `/api/` location in the web vhost so API calls do not reach Next.js.
 
 Use template: `docs/nginx/trace-web.same-origin-api.conf.example`
 
 Minimum expected behavior:
-
-- `/api/*` -> Fastify upstream
-- all non-`/api/*` -> Next.js upstream
+- `/api/*` routes to Fastify
+- all non-`/api/*` routes go to Next.js
 
 After config changes:
 
@@ -46,20 +57,12 @@ sudo systemctl reload nginx
 
 ## Staging Rollout
 
-1. Deploy updated web build and API build to staging.
+1. Deploy updated web and API builds to staging.
 2. Apply env updates for staging services.
-3. Restart services:
-
-```bash
-sudo systemctl restart trace-api-staging
-sudo systemctl restart trace-web-staging
-sudo systemctl status trace-api-staging --no-pager
-sudo systemctl status trace-web-staging --no-pager
-```
-
+3. Restart or rebuild the relevant services.
 4. Apply nginx config and reload.
 
-### Staging Validation Checklist (must all pass)
+### Staging Validation Checklist
 
 Routing:
 
@@ -71,35 +74,47 @@ curl -i -X POST https://trace-staging.adventurous.systems/api/v1/auth/login \
 ```
 
 Expected:
+- `/login` returns `200` HTML from Next.js
+- `/api/v1/auth/login` returns API JSON, typically `401`, not a Next.js 404 page
 
-- `/login` -> `200` HTML from Next.js.
-- `/api/v1/auth/login` -> JSON response from API, typically `401`, not Next.js 404 page.
+Public auth:
+1. Register a new user at `/register`
+2. Confirm the returned or stored role is `buyer`
+3. Confirm a buyer lands in `/marketplace` after sign-in
 
-Automated smoke check:
+Buyer access-request flow:
+1. Open `/access-request` as a buyer
+2. Submit a request for `hub_staff` or `hub_admin`
+3. Confirm the page shows the active `pending` request
+4. Reject or revoke the user later and confirm the buyer can submit a fresh request again
 
-```bash
-bash scripts/auth-smoke.sh https://trace-staging.adventurous.systems
-AUTH_TEST_EMAIL=<staging-test-user> AUTH_TEST_PASSWORD=<password> \
-  bash scripts/auth-smoke.sh https://trace-staging.adventurous.systems
-```
-
-Functional:
-
-1. Sign in with dedicated staging test user.
-2. Confirm redirect to `/dashboard`.
-3. Refresh `/dashboard` and confirm still authenticated.
-4. Sign out and confirm redirect to `/login`.
-5. Force invalid token in local storage and confirm protected route redirects to `/login`.
+Platform-admin flow:
+1. Sign in as `platform@trace.eco`
+2. Open `/admin/access-requests`
+3. Confirm the three views load:
+   - pending requests
+   - approved access
+   - organisations
+4. Edit a pending request and approve it
+5. Approve with either:
+   - an existing organisation, or
+   - a custom organisation name that creates a new hub organisation
+6. In approved access, verify:
+   - role change between `hub_staff` and `hub_admin`
+   - organisation reassignment
+   - revoke back to `buyer`
+7. In organisations, verify:
+   - organisation rename
+   - verified toggle
 
 Regression:
 
 ```bash
-# Replace with token from successful login response
 curl -i https://trace-staging.adventurous.systems/api/v1/auth/me \
   -H "authorization: Bearer <TOKEN>"
 ```
 
-Expected: `200` JSON with authenticated user payload.
+Expected: `200` JSON with the authenticated user payload.
 
 Logs:
 
@@ -109,32 +124,38 @@ sudo tail -n 200 /var/log/nginx/access.log
 sudo tail -n 200 /var/log/nginx/error.log
 ```
 
-## Production Rollout (Immediate After Staging Pass)
+## Production Rollout
+
+Only after staging passes:
 
 1. Apply the same nginx pattern and corresponding production upstream ports.
-2. Deploy the same web/API release versions.
-3. Apply production env values (`WEB_URL`, optional explicit `NEXT_PUBLIC_API_URL`).
-4. Restart services:
+2. Deploy the same web and API release versions.
+3. Apply production env values.
+4. Restart or rebuild production services.
+5. Re-run an abbreviated version of the staging validation checklist.
 
-```bash
-sudo systemctl restart trace-api
-sudo systemctl restart trace-web
-sudo systemctl status trace-api --no-pager
-sudo systemctl status trace-web --no-pager
-```
-
-5. Run abbreviated smoke checks:
-   - `/login` returns `200`.
-   - invalid login to `/api/v1/auth/login` returns API JSON `401` (not Next.js 404).
-   - valid login with dedicated production test user reaches `/dashboard`.
-   - `/api/v1/auth/me` works with returned token.
-   - `bash scripts/auth-smoke.sh https://trace.adventurous.systems` (with and without credentials).
+Minimum production checks:
+- `/login` returns `200`
+- invalid login to `/api/v1/auth/login` returns API JSON `401`
+- buyer signup still creates `buyer`
+- `/access-request` works for a test buyer
+- `/admin/access-requests` loads for `platform_admin`
+- revoke and reapply flow still works
+- `/api/v1/auth/me` works with a valid token
 
 ## Rollback
 
-If auth fails after deployment:
+If auth or access management fails after deployment:
 
-1. Revert nginx vhost to previous known-good config and reload nginx.
-2. Revert web service to previous release and restart `trace-web*`.
+1. Revert nginx vhost to the previous known-good config and reload nginx.
+2. Revert web service to the previous release and restart it.
 3. Revert API service only if API regressions are observed.
-4. Re-run the routing checks to confirm rollback success.
+4. Re-run the routing and auth checks to confirm rollback success.
+
+## Notes
+
+Current intentional constraints:
+- self-signup is buyer-only
+- elevated roles are not self-service
+- requests and organisations are not hard-deleted
+- revocation preserves history but should not block a buyer from reapplying
