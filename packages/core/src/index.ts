@@ -104,13 +104,19 @@ export {
   AccessRequestStatusSchema,
   CreateAccessRequestSchema,
   AccessRequestQuerySchema,
+  UpdatePendingAccessRequestSchema,
   ApproveAccessRequestSchema,
+  UpdateApprovedUserAccessSchema,
+  UpdateAccessRequestOrganisationSchema,
   RejectAccessRequestSchema,
 } from './validators/access-request.schema.js';
 export type {
   CreateAccessRequestInput,
   AccessRequestQueryInput,
+  UpdatePendingAccessRequestInput,
   ApproveAccessRequestInput,
+  UpdateApprovedUserAccessInput,
+  UpdateAccessRequestOrganisationInput,
   RejectAccessRequestInput,
 } from './validators/access-request.schema.js';
 

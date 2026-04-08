@@ -4,6 +4,9 @@ import {
   ApproveAccessRequestSchema,
   CreateAccessRequestSchema,
   RejectAccessRequestSchema,
+  UpdateAccessRequestOrganisationSchema,
+  UpdateApprovedUserAccessSchema,
+  UpdatePendingAccessRequestSchema,
 } from '@trace/core';
 import { authenticate, authorize } from '../../middleware/auth.js';
 import {
@@ -13,6 +16,9 @@ import {
   listMyAccessRequests,
   rejectAccessRequest,
   submitAccessRequest,
+  updateAccessRequestOrganisation,
+  updateApprovedUserAccess,
+  updatePendingAccessRequest,
 } from './access-request.service.js';
 
 export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
@@ -71,6 +77,34 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  app.patch(
+    '/organisations/:id',
+    { preHandler: [authenticate, authorize('platform_admin')] },
+    async (request, reply) => {
+      const input = UpdateAccessRequestOrganisationSchema.parse(request.body);
+      const params = request.params as { id: string };
+      const data = await updateAccessRequestOrganisation(params.id, input);
+      return reply.send({
+        success: true,
+        data,
+      });
+    },
+  );
+
+  app.patch(
+    '/:id',
+    { preHandler: [authenticate, authorize('platform_admin')] },
+    async (request, reply) => {
+      const input = UpdatePendingAccessRequestSchema.parse(request.body);
+      const params = request.params as { id: string };
+      const data = await updatePendingAccessRequest(params.id, input);
+      return reply.send({
+        success: true,
+        data,
+      });
+    },
+  );
+
   app.post(
     '/:id/approve',
     { preHandler: [authenticate, authorize('platform_admin')] },
@@ -78,6 +112,25 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
       const input = ApproveAccessRequestSchema.parse(request.body);
       const params = request.params as { id: string };
       const data = await approveAccessRequest(
+        params.id,
+        request.user.sub,
+        input,
+      );
+
+      return reply.send({
+        success: true,
+        data,
+      });
+    },
+  );
+
+  app.patch(
+    '/:id/approved-user',
+    { preHandler: [authenticate, authorize('platform_admin')] },
+    async (request, reply) => {
+      const input = UpdateApprovedUserAccessSchema.parse(request.body);
+      const params = request.params as { id: string };
+      const data = await updateApprovedUserAccess(
         params.id,
         request.user.sub,
         input,

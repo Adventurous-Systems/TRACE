@@ -114,6 +114,61 @@ describe('access request flow', () => {
     expect(body.data.user.organisationId).toBe(organisationId);
   });
 
+  it('allows a platform admin to edit a pending request before review', async () => {
+    const buyerEmail = `buyer-edit-${Date.now()}@example.com`;
+    const passwordHash = await bcrypt.hash('BuyerEdit123!', 10);
+    await db.insert(users).values({
+      email: buyerEmail,
+      passwordHash,
+      name: 'Buyer Edit',
+      role: 'buyer',
+      organisationId: null,
+    });
+
+    const buyerAuth = await getAuthHeader(app, buyerEmail, 'BuyerEdit123!');
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/access-requests',
+      headers: buyerAuth,
+      payload: {
+        requestedRole: 'hub_staff',
+        organisationName: 'Old Hub Name',
+        notes: 'Old request notes',
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = createRes.json<{ data: { id: string } }>();
+
+    const updateRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/access-requests/${created.data.id}`,
+      headers: platformAdminAuth,
+      payload: {
+        requestedRole: 'hub_admin',
+        organisationName: 'Updated Hub Name',
+        notes: 'Updated request notes',
+        reviewNotes: 'Admin updated before approval',
+      },
+    });
+
+    expect(updateRes.statusCode).toBe(200);
+    const body = updateRes.json<{
+      success: boolean;
+      data: {
+        requestedRole: string;
+        organisationName: string | null;
+        notes: string | null;
+        reviewNotes: string | null;
+      };
+    }>();
+    expect(body.success).toBe(true);
+    expect(body.data.requestedRole).toBe('hub_admin');
+    expect(body.data.organisationName).toBe('Updated Hub Name');
+    expect(body.data.notes).toBe('Updated request notes');
+    expect(body.data.reviewNotes).toBe('Admin updated before approval');
+  });
+
   it('allows a platform admin to reject a pending request', async () => {
     const buyerEmail = `buyer-reject-${Date.now()}@example.com`;
     const passwordHash = await bcrypt.hash('BuyerReject123!', 10);
@@ -160,5 +215,162 @@ describe('access request flow', () => {
     });
     expect(unchangedBuyer?.role).toBe('buyer');
     expect(unchangedBuyer?.organisationId).toBeNull();
+  });
+
+  it('creates a new organisation from the requested name when approving without an existing organisation id', async () => {
+    const buyerEmail = `buyer-new-org-${Date.now()}@example.com`;
+    const passwordHash = await bcrypt.hash('BuyerNewOrg123!', 10);
+    const [buyer] = await db.insert(users).values({
+      email: buyerEmail,
+      passwordHash,
+      name: 'Buyer New Org',
+      role: 'buyer',
+      organisationId: null,
+    }).returning();
+
+    const buyerAuth = await getAuthHeader(app, buyerEmail, 'BuyerNewOrg123!');
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/access-requests',
+      headers: buyerAuth,
+      payload: {
+        requestedRole: 'hub_staff',
+        organisationName: 'New Beta Reuse Hub',
+        notes: 'Please create this hub for testing',
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = createRes.json<{ data: { id: string } }>();
+
+    const approveRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/access-requests/${created.data.id}/approve`,
+      headers: platformAdminAuth,
+      payload: {
+        role: 'hub_staff',
+        organisationName: 'New Beta Reuse Hub',
+        reviewNotes: 'Approved and created a new hub',
+      },
+    });
+
+    expect(approveRes.statusCode).toBe(200);
+    const body = approveRes.json<{
+      success: boolean;
+      data: { status: string; targetOrganisationId: string | null };
+    }>();
+    expect(body.success).toBe(true);
+    expect(body.data.status).toBe('approved');
+    expect(body.data.targetOrganisationId).toBeTruthy();
+
+    const createdOrganisation = await db.query.organisations.findFirst({
+      where: eq(organisations.name, 'New Beta Reuse Hub'),
+    });
+    expect(createdOrganisation).toBeTruthy();
+    expect(createdOrganisation?.type).toBe('hub');
+
+    const updatedBuyer = await db.query.users.findFirst({
+      where: eq(users.id, buyer!.id),
+    });
+    expect(updatedBuyer?.role).toBe('hub_staff');
+    expect(updatedBuyer?.organisationId).toBe(createdOrganisation?.id);
+  });
+
+  it('allows a platform admin to update approved user access and revoke back to buyer', async () => {
+    const buyerEmail = `buyer-approved-${Date.now()}@example.com`;
+    const passwordHash = await bcrypt.hash('BuyerApproved123!', 10);
+    const [buyer] = await db.insert(users).values({
+      email: buyerEmail,
+      passwordHash,
+      name: 'Buyer Approved',
+      role: 'buyer',
+      organisationId: null,
+    }).returning();
+
+    const buyerAuth = await getAuthHeader(app, buyerEmail, 'BuyerApproved123!');
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/access-requests',
+      headers: buyerAuth,
+      payload: {
+        requestedRole: 'hub_staff',
+        organisationName: 'Approved Hub',
+        notes: 'Initial approval request',
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = createRes.json<{ data: { id: string } }>();
+
+    const approveRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/access-requests/${created.data.id}/approve`,
+      headers: platformAdminAuth,
+      payload: {
+        role: 'hub_staff',
+        organisationId,
+      },
+    });
+    expect(approveRes.statusCode).toBe(200);
+
+    const updateApproved = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/access-requests/${created.data.id}/approved-user`,
+      headers: platformAdminAuth,
+      payload: {
+        role: 'hub_admin',
+        organisationName: 'Moved Hub Name',
+        reviewNotes: 'Moved to a new hub and elevated role',
+      },
+    });
+    expect(updateApproved.statusCode).toBe(200);
+    const updatedBody = updateApproved.json<{
+      data: {
+        user: { role: string; organisationId: string | null } | null;
+        targetOrganisation: { name: string } | null;
+      };
+    }>();
+    expect(updatedBody.data.user?.role).toBe('hub_admin');
+    expect(updatedBody.data.targetOrganisation?.name).toBe('Moved Hub Name');
+
+    const revokeRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/access-requests/${created.data.id}/approved-user`,
+      headers: platformAdminAuth,
+      payload: {
+        role: 'buyer',
+        reviewNotes: 'Revoked back to buyer',
+      },
+    });
+    expect(revokeRes.statusCode).toBe(200);
+
+    const revokedBuyer = await db.query.users.findFirst({
+      where: eq(users.id, buyer!.id),
+    });
+    expect(revokedBuyer?.role).toBe('buyer');
+    expect(revokedBuyer?.organisationId).toBeNull();
+  });
+
+  it('allows a platform admin to rename and verify an organisation', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/access-requests/organisations/${organisationId}`,
+      headers: platformAdminAuth,
+      payload: {
+        name: 'Stirling Reuse Hub Updated',
+        verified: false,
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ success: boolean; data: { name: string; verified: boolean } }>();
+    expect(body.success).toBe(true);
+    expect(body.data.name).toBe('Stirling Reuse Hub Updated');
+    expect(body.data.verified).toBe(false);
+
+    await db
+      .update(organisations)
+      .set({ name: 'Stirling Reuse Hub', verified: true })
+      .where(eq(organisations.id, organisationId));
   });
 });

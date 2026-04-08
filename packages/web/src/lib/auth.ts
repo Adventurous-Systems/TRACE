@@ -15,6 +15,11 @@ export interface StoredUser {
   organisationId: string | null;
 }
 
+export interface SessionState {
+  token: string | null;
+  user: StoredUser | null;
+}
+
 export function getPostAuthRedirect(user: StoredUser): string {
   return user.role === 'buyer' ? '/marketplace' : '/dashboard';
 }
@@ -33,6 +38,13 @@ export function getUser(): StoredUser | null {
   } catch {
     return null;
   }
+}
+
+export function getSession(): SessionState {
+  return {
+    token: getToken(),
+    user: getUser(),
+  };
 }
 
 export function saveSession(token: string, user: StoredUser): void {
