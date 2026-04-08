@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { clearSession, getUser, type StoredUser } from '@/lib/auth';
 import { marketplace, type ListingSummary } from '@/lib/api-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,11 @@ export default function MarketplacePage() {
   const [categoryL1, setCategoryL1] = useState('');
   const [conditionGrade, setConditionGrade] = useState('');
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<StoredUser | null>(null);
+
+  useEffect(() => {
+    setUser(getUser());
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -46,6 +52,11 @@ export default function MarketplacePage() {
 
   const totalPages = Math.ceil(total / 20);
 
+  function handleSignOut() {
+    clearSession();
+    setUser(null);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -57,9 +68,25 @@ export default function MarketplacePage() {
             </div>
             <span className="font-semibold text-sm">TRACE Marketplace</span>
           </Link>
-          <Link href="/login">
-            <Button variant="outline" size="sm">Sign in</Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            {user?.role === 'buyer' && (
+              <Link href="/access-request">
+                <Button variant="outline" size="sm">Request seller access</Button>
+              </Link>
+            )}
+            {user && user.role !== 'buyer' && (
+              <Link href="/dashboard">
+                <Button variant="outline" size="sm">Dashboard</Button>
+              </Link>
+            )}
+            {user ? (
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>Sign out</Button>
+            ) : (
+              <Link href="/login">
+                <Button variant="outline" size="sm">Sign in</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 

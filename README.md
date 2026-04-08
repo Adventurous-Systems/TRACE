@@ -2,7 +2,7 @@
 
 [TRACE](https://trace.construction/) is a blockchain-enabled digital marketplace for construction material reuse hubs. It issues EU DPP-compliant material passports, anchors integrity proofs on VeChainThor, and governs the system through Ostrom commons principles via smart contracts.
 
-**Read [`SPEC.md`](./SPEC.md)** for the full specification. **Read [`startup.md`](./startup.md)** for local dev setup.
+**Read [`SPEC.md`](./SPEC.md)** for the full specification. **Read [`startup.md`](./startup.md)** for local dev setup. **Read [`GIT_WORKFLOW.md`](./GIT_WORKFLOW.md)** for the staging-to-production release process.
 
 ---
 
@@ -132,10 +132,17 @@ pnpm --filter @trace/web dev   # http://localhost:3000
 
 | Role | Email | Password |
 |------|-------|----------|
+| Platform Admin | platform@trace.eco | Platform1234! |
 | Hub Staff | staff@stirlingreuse.com | Staff1234! |
 | Hub Admin | admin@stirlingreuse.com | Admin1234! |
 | Inspector | inspector@trace.eco | Inspector1234! |
 | Buyer | buyer@example.com | Buyer1234! |
+
+**Public auth notes:**
+
+- `/register` creates a public `buyer` account only.
+- Buyers can submit `/access-request` to request `hub_staff` or `hub_admin` access.
+- Elevated roles are approved internally and assigned with an organisation; they are not self-service.
 
 ---
 

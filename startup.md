@@ -49,6 +49,7 @@ docker compose up -d
 
 | Role       | Email                       | Password       |
 |------------|-----------------------------|----------------|
+| Platform Admin | platform@trace.eco      | Platform1234!  |
 | Hub Staff  | staff@stirlingreuse.com     | Staff1234!     |
 | Hub Admin  | admin@stirlingreuse.com     | Admin1234!     |
 | Inspector  | inspector@trace.eco         | Inspector1234! |

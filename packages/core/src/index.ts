@@ -99,6 +99,21 @@ export type {
   QualityQueryInput,
 } from './validators/quality.schema.js';
 
+export {
+  AccessRequestRoleSchema,
+  AccessRequestStatusSchema,
+  CreateAccessRequestSchema,
+  AccessRequestQuerySchema,
+  ApproveAccessRequestSchema,
+  RejectAccessRequestSchema,
+} from './validators/access-request.schema.js';
+export type {
+  CreateAccessRequestInput,
+  AccessRequestQueryInput,
+  ApproveAccessRequestInput,
+  RejectAccessRequestInput,
+} from './validators/access-request.schema.js';
+
 // Logger
 export { createLogger, logger } from './logger.js';
 export type { Logger } from './logger.js';

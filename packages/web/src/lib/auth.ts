@@ -15,6 +15,10 @@ export interface StoredUser {
   organisationId: string | null;
 }
 
+export function getPostAuthRedirect(user: StoredUser): string {
+  return user.role === 'buyer' ? '/marketplace' : '/dashboard';
+}
+
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem(TOKEN_KEY);

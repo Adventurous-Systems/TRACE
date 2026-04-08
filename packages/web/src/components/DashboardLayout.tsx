@@ -40,6 +40,10 @@ export default function DashboardLayout({ children }: Props) {
     { href: '/scan', label: 'Scan QR' },
   ];
 
+  if (user.role === 'platform_admin') {
+    navLinks.push({ href: '/admin/access-requests', label: 'Access Requests' });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-50">

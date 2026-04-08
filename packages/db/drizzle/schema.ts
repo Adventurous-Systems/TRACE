@@ -55,6 +55,36 @@ export const users = pgTable(
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
+// ── Beta Access Requests ────────────────────────────────────────────────────
+
+export const betaAccessRequests = pgTable(
+  'beta_access_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    requestedRole: text('requested_role').notNull(), // hub_staff | hub_admin
+    organisationName: text('organisation_name'),
+    targetOrganisationId: uuid('target_organisation_id').references(() => organisations.id),
+    notes: text('notes'),
+    reviewNotes: text('review_notes'),
+    status: text('status').notNull().default('pending'), // pending | approved | rejected
+    reviewedBy: uuid('reviewed_by').references(() => users.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_beta_access_requests_user').on(table.userId),
+    index('idx_beta_access_requests_status').on(table.status),
+    index('idx_beta_access_requests_target_org').on(table.targetOrganisationId),
+  ],
+);
+
+export type BetaAccessRequest = typeof betaAccessRequests.$inferSelect;
+export type NewBetaAccessRequest = typeof betaAccessRequests.$inferInsert;
+
 // ── Material Passports ───────────────────────────────────────────────────────
 
 export const materialPassports = pgTable(
@@ -322,10 +352,29 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.organisationId],
     references: [organisations.id],
   }),
+  accessRequests: many(betaAccessRequests, { relationName: 'requester' }),
+  reviewedAccessRequests: many(betaAccessRequests, { relationName: 'reviewer' }),
   passportsRegistered: many(materialPassports),
   listings: many(listings),
   buyerTransactions: many(transactions, { relationName: 'buyer' }),
   sellerTransactions: many(transactions, { relationName: 'seller' }),
+}));
+
+export const betaAccessRequestsRelations = relations(betaAccessRequests, ({ one }) => ({
+  user: one(users, {
+    fields: [betaAccessRequests.userId],
+    references: [users.id],
+    relationName: 'requester',
+  }),
+  targetOrganisation: one(organisations, {
+    fields: [betaAccessRequests.targetOrganisationId],
+    references: [organisations.id],
+  }),
+  reviewer: one(users, {
+    fields: [betaAccessRequests.reviewedBy],
+    references: [users.id],
+    relationName: 'reviewer',
+  }),
 }));
 
 export const materialPassportsRelations = relations(materialPassports, ({ one, many }) => ({
