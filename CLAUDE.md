@@ -328,4 +328,4 @@ Priority order:
 7. Public passport view page (scan QR → see material data)
 8. Basic auth (JWT, hub staff role)
 
-Everything else can wait. Get this loop working first.
+
