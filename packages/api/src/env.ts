@@ -39,6 +39,7 @@ const envSchema = z.object({
   MINIO_SECRET_KEY: z.string().default('minioadmin'),
   MINIO_BUCKET_PASSPORTS: z.string().default('passports'),
   MINIO_BUCKET_REPORTS: z.string().default('reports'),
+  MINIO_PUBLIC_URL: z.string().url().optional(),
 
   // Meilisearch
   MEILISEARCH_URL: z.string().url().default('http://localhost:7700'),
