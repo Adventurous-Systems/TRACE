@@ -80,6 +80,10 @@ contract MaterialRegistry is AccessControl, Pausable {
     error InvalidPassportId();
     error InvalidDataHash();
     error InvalidAddress();
+    error ArrayLengthMismatch();
+    error BatchTooLarge(uint256 size);
+
+    uint256 public constant MAX_BATCH_SIZE = 100;
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
@@ -143,7 +147,8 @@ contract MaterialRegistry is AccessControl, Pausable {
         string[] calldata metadataUris
     ) external onlyRole(HUB_ROLE) whenNotPaused {
         uint256 len = passportIds.length;
-        require(len == dataHashes.length && len == metadataUris.length, "Length mismatch");
+        if (len != dataHashes.length || len != metadataUris.length) revert ArrayLengthMismatch();
+        if (len > MAX_BATCH_SIZE) revert BatchTooLarge(len);
 
         uint64 ts = uint64(block.timestamp);
 

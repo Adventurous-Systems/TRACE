@@ -8,14 +8,20 @@ import {
   ForbiddenError,
 } from '@trace/core';
 import QRCode from 'qrcode';
+import { ThorClient } from '@vechain/sdk-network';
+import { ABIFunction } from '@vechain/sdk-core';
 import { anchorQueue } from '../../lib/queue.js';
 import { uploadBuffer } from '../../lib/storage.js';
 import { env } from '../../env.js';
 
+// Module-level singleton (avoids reconnecting on every verify call)
+const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface PassportWithVerification extends MaterialPassport {
-  verified?: boolean;
+  verified: boolean;
+  onchainVerified: boolean | null;
 }
 
 // ─── Create ──────────────────────────────────────────────────────────────────
@@ -224,6 +230,15 @@ export async function updatePassport(
  * The actual hash comparison is done in the blockchain worker/service,
  * so here we just surface the stored anchor data.
  */
+// Minimal ABI for MaterialRegistry.verifyPassport — only `valid` bool needed, tuple omitted
+const VERIFY_FUNCTION = new ABIFunction(
+  'function verifyPassport(bytes32 passportId, bytes32 dataHash) external view returns (bool valid)',
+);
+
+function uuidToBytes32(uuid: string): string {
+  return '0x' + uuid.replace(/-/g, '').padStart(64, '0');
+}
+
 export async function verifyPassport(passportId: string): Promise<PassportWithVerification> {
   const passport = await db.query.materialPassports.findFirst({
     where: eq(materialPassports.id, passportId),
@@ -234,7 +249,23 @@ export async function verifyPassport(passportId: string): Promise<PassportWithVe
   const verified =
     passport.blockchainTxHash !== null && passport.blockchainAnchoredAt !== null;
 
-  return { ...passport, verified };
+  // Attempt on-chain verification when registry and stored hash are available
+  let onchainVerified: boolean | null = null;
+  if (env.MATERIAL_REGISTRY_ADDRESS && passport.blockchainPassportHash) {
+    try {
+      const result = await thorClient.contracts.executeCall(
+        env.MATERIAL_REGISTRY_ADDRESS,
+        VERIFY_FUNCTION,
+        [uuidToBytes32(passportId), passport.blockchainPassportHash],
+      );
+      onchainVerified = result.result?.array?.[0] === true;
+    } catch (err) {
+      // Node unreachable or contract not deployed — return null, not an error
+      onchainVerified = null;
+    }
+  }
+
+  return { ...passport, verified, onchainVerified };
 }
 
 // ─── History ─────────────────────────────────────────────────────────────────

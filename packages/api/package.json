@@ -20,7 +20,7 @@
     "@trace/db": "workspace:*",
     "@vechain/sdk-core": "^1.0.0",
     "@vechain/sdk-network": "^1.0.0",
-    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
     "bullmq": "^5.13.0",
     "dotenv": "^16.4.0",
     "drizzle-orm": "^0.36.0",
@@ -32,7 +32,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
     "@types/qrcode": "^1.5.5",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",

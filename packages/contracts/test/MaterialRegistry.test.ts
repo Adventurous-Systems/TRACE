@@ -121,6 +121,37 @@ describe('MaterialRegistry', () => {
       await registry.connect(hub).registerPassportBatch(ids, hashes, uris);
       expect(await registry.totalPassports()).to.equal(3);
     });
+
+    it('reverts ArrayLengthMismatch when hashes array is shorter', async () => {
+      const ids = [randomId(), randomId()];
+      const hashes = [hashPassport('only-one')]; // length mismatch
+      const uris = ['uri-0', 'uri-1'];
+
+      await expect(
+        registry.connect(hub).registerPassportBatch(ids, hashes, uris),
+      ).to.be.revertedWithCustomError(registry, 'ArrayLengthMismatch');
+    });
+
+    it('reverts ArrayLengthMismatch when uris array is shorter', async () => {
+      const ids = [randomId(), randomId()];
+      const hashes = ids.map((_, i) => hashPassport(`h-${i}`));
+      const uris = ['only-one']; // length mismatch
+
+      await expect(
+        registry.connect(hub).registerPassportBatch(ids, hashes, uris),
+      ).to.be.revertedWithCustomError(registry, 'ArrayLengthMismatch');
+    });
+
+    it('reverts BatchTooLarge when more than MAX_BATCH_SIZE items', async () => {
+      const count = 101;
+      const ids = Array.from({ length: count }, () => randomId());
+      const hashes = ids.map((_, i) => hashPassport(`h-${i}`));
+      const uris = ids.map((_, i) => `uri-${i}`);
+
+      await expect(
+        registry.connect(hub).registerPassportBatch(ids, hashes, uris),
+      ).to.be.revertedWithCustomError(registry, 'BatchTooLarge');
+    });
   });
 
   // ─── verifyPassport ───────────────────────────────────────────────────────

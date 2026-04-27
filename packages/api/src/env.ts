@@ -21,6 +21,12 @@ const envSchema = z.object({
 
   // VeChain
   VECHAIN_NODE_URL: z.string().url().default('http://localhost:8669'),
+  DEPLOYER_PRIVATE_KEY: z
+    .string()
+    .transform(v => v && v !== '0x' ? v : undefined)
+    .pipe(
+      z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'DEPLOYER_PRIVATE_KEY must be a 0x-prefixed 32-byte hex string').optional(),
+    ),
   MATERIAL_REGISTRY_ADDRESS: z.string().optional(),
   MARKETPLACE_ADDRESS: z.string().optional(),
   CBT_ADDRESS: z.string().optional(),
