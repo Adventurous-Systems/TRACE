@@ -230,10 +230,28 @@ export async function updatePassport(
  * The actual hash comparison is done in the blockchain worker/service,
  * so here we just surface the stored anchor data.
  */
-// Minimal ABI for MaterialRegistry.verifyPassport — only `valid` bool needed, tuple omitted
-const VERIFY_FUNCTION = new ABIFunction(
-  'function verifyPassport(bytes32 passportId, bytes32 dataHash) external view returns (bool valid)',
-);
+const VERIFY_FUNCTION = new ABIFunction({
+  type: 'function',
+  name: 'verifyPassport',
+  inputs: [
+    { name: 'passportId', type: 'bytes32' },
+    { name: 'dataHash', type: 'bytes32' },
+  ],
+  outputs: [
+    { name: 'valid', type: 'bool' },
+    {
+      name: 'record', type: 'tuple', components: [
+        { name: 'dataHash', type: 'bytes32' },
+        { name: 'owner', type: 'address' },
+        { name: 'status', type: 'uint8' },
+        { name: 'registeredAt', type: 'uint64' },
+        { name: 'updatedAt', type: 'uint64' },
+        { name: 'metadataUri', type: 'string' },
+      ],
+    },
+  ],
+  stateMutability: 'view',
+});
 
 function uuidToBytes32(uuid: string): string {
   return '0x' + uuid.replace(/-/g, '').padStart(64, '0');

@@ -28,11 +28,12 @@ services:
 
   thor-solo:
     image: vechain/thor:latest
-    command: solo --on-demand --persist --api-cors '*' --api-addr 0.0.0.0:8669
+    command: solo --genesis /genesis.json --on-demand --persist --api-cors '*' --api-addr 0.0.0.0:8669
     ports:
       - "8670:8669"
     volumes:
       - thor-data:/home/thor
+      - ./genesis.json:/genesis.json:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8669/blocks/best || exit 1"]
       interval: 10s

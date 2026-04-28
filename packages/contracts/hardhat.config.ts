@@ -1,6 +1,10 @@
 import { HardhatUserConfig } from 'hardhat/config';
-import '@nomicfoundation/hardhat-toolbox';
+import '@nomicfoundation/hardhat-chai-matchers';
+import '@nomicfoundation/hardhat-network-helpers';
 import '@vechain/sdk-hardhat-plugin';
+import { config as dotenvConfig } from 'dotenv';
+
+dotenvConfig({ path: '../../.env' });
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -16,9 +20,7 @@ const config: HardhatUserConfig = {
   networks: {
     vechain_solo: {
       url: process.env.VECHAIN_NODE_URL ?? 'http://localhost:8669',
-      accounts: process.env.DEPLOYER_PRIVATE_KEY
-        ? [process.env.DEPLOYER_PRIVATE_KEY]
-        : ['0x99f0500549792796c14fed62011a51081dc5b5e68fe8bd8a13b86be829c4fd36'],
+      accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
     vechain_testnet: {
       url: 'https://testnet.veblocks.net',

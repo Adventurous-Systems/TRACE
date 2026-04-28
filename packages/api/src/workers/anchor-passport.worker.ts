@@ -4,7 +4,7 @@
  * Flow:
  *   1. Receive { passportId, organisationId } from the anchor-passport BullMQ queue
  *   2. Load the full passport from the DB
- *   3. Serialise to canonical JSON-LD
+ *   3. Serialise to canonical JSON-LD (keys sorted for reproducible hash)
  *   4. Compute keccak256 hash
  *   5. Submit to MaterialRegistry.registerPassport() on VeChainThor
  *   6. Poll for tx confirmation
@@ -16,7 +16,8 @@ import { eq } from 'drizzle-orm';
 import { db, materialPassports, type MaterialPassport } from '@trace/db';
 import { createLogger } from '@trace/core';
 import { ThorClient } from '@vechain/sdk-network';
-import { keccak256, Interface, Wallet } from 'ethers';
+import { Transaction } from '@vechain/sdk-core';
+import { keccak256, Interface } from 'ethers';
 import { env } from '../env.js';
 import { redisConnection, type AnchorPassportJob } from '../lib/queue.js';
 
@@ -24,9 +25,8 @@ const logger = createLogger('anchor-worker');
 
 // ─── VeChain setup ─────────────────────────────────────────────────────────
 
-function getThorClient() {
-  return ThorClient.at(env.VECHAIN_NODE_URL);
-}
+// Module-level singleton — one ThorClient per worker process
+const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
 
 // Minimal ABI for MaterialRegistry
 const REGISTRY_ABI = [
@@ -74,7 +74,11 @@ function buildCanonicalJsonLd(passport: MaterialPassport): string {
     createdAt: passport.createdAt.toISOString(),
   };
 
-  return JSON.stringify(doc);
+  // Sort keys to ensure hash is reproducible regardless of source insertion order
+  const sorted = Object.fromEntries(
+    Object.entries(doc).sort(([a], [b]) => a.localeCompare(b)),
+  );
+  return JSON.stringify(sorted);
 }
 
 // ─── UUID → bytes32 ───────────────────────────────────────────────────────
@@ -109,13 +113,11 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
   }
 
   if (!env.MATERIAL_REGISTRY_ADDRESS) {
-    logger.warn({ passportId }, 'MATERIAL_REGISTRY_ADDRESS not set — skipping blockchain anchor');
-    return;
+    throw new Error('MATERIAL_REGISTRY_ADDRESS is not set — cannot anchor passport');
   }
 
-  if (!process.env['DEPLOYER_PRIVATE_KEY']) {
-    logger.warn({ passportId }, 'DEPLOYER_PRIVATE_KEY not set — skipping blockchain anchor');
-    return;
+  if (!env.DEPLOYER_PRIVATE_KEY) {
+    throw new Error('DEPLOYER_PRIVATE_KEY is not set — cannot anchor passport');
   }
 
   // Compute hash
@@ -134,9 +136,8 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
     metadataUri,
   ]);
 
-  // Submit via ThorClient
-  const thorClient = getThorClient();
-  const wallet = new Wallet(process.env['DEPLOYER_PRIVATE_KEY']!);
+  // Sign and submit via VeChain SDK
+  const privKey = Buffer.from(env.DEPLOYER_PRIVATE_KEY.replace(/^0x/, ''), 'hex');
 
   try {
     const txBody = await thorClient.transactions.buildTransactionBody(
@@ -147,27 +148,25 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
           data: callData,
         },
       ],
-      0,
+      500_000,
     );
 
-    const rawTx = await wallet.signTransaction({
-      ...txBody,
-      chainId: txBody.chainTag,
-    } as Parameters<typeof wallet.signTransaction>[0]);
+    const signedTx = Transaction.of(txBody).sign(privKey);
+    const rawTx = '0x' + Buffer.from(signedTx.encoded).toString('hex');
 
     const { id: txId } = await thorClient.transactions.sendRawTransaction(rawTx);
     logger.info({ passportId, txId }, 'Transaction submitted');
 
-    // Poll for confirmation (up to 60s)
+    // Poll for confirmation (up to 60s — VeChain block time ~10s; Solo: near-instant)
     let receipt = null;
     for (let i = 0; i < 12; i++) {
-      await sleep(5000);
       try {
         receipt = await thorClient.transactions.getTransactionReceipt(txId);
         if (receipt) break;
       } catch {
         // not yet confirmed
       }
+      await sleep(5000);
     }
 
     if (!receipt || receipt.reverted) {
