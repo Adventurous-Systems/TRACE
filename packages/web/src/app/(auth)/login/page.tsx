@@ -95,7 +95,7 @@ export default function LoginPage() {
               </Button>
               <p className="text-center text-sm text-gray-500">
                 New to TRACE?{' '}
-                <Link href={safeNextPath ? `/register?next=${encodeURIComponent(safeNextPath)}` : '/register'} className="text-brand-600 hover:underline">
+                <Link href={safeNextPath ? `/register?next=${encodeURIComponent(safeNextPath)}` : '/register'} className="text-brand-600 underline">
                   Create an account
                 </Link>
               </p>

@@ -131,7 +131,7 @@ export default function RegisterPage() {
               </Button>
               <p className="text-center text-sm text-gray-500">
                 Already have an account?{' '}
-                <Link href={safeNextPath ? `/login?next=${encodeURIComponent(safeNextPath)}` : '/login'} className="text-brand-600 hover:underline">
+                <Link href={safeNextPath ? `/login?next=${encodeURIComponent(safeNextPath)}` : '/login'} className="text-brand-600 underline">
                   Sign in
                 </Link>
               </p>

@@ -68,6 +68,7 @@ export default function PassportsPage() {
             className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-64"
           />
           <select
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

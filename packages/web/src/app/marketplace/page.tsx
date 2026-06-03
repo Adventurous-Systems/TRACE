@@ -115,6 +115,7 @@ export default function MarketplacePage() {
             className="h-9 rounded-md border border-input bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring w-64"
           />
           <select
+            aria-label="Filter by category"
             value={categoryL1}
             onChange={(e) => { setCategoryL1(e.target.value); setPage(1); }}
             className="h-9 rounded-md border border-input bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -136,6 +137,7 @@ export default function MarketplacePage() {
             ))}
           </select>
           <select
+            aria-label="Filter by condition grade"
             value={conditionGrade}
             onChange={(e) => { setConditionGrade(e.target.value); setPage(1); }}
             className="h-9 rounded-md border border-input bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
