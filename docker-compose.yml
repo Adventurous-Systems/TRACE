@@ -96,8 +96,8 @@ services:
     ports:
       - "17701:7700"
     environment:
-      MEILI_MASTER_KEY: masterKey
-      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-masterKey}
+      MEILI_ENV: ${MEILI_ENV:-development}
     volumes:
       - meili-data:/meili_data
     healthcheck:

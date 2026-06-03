@@ -24,9 +24,24 @@ export function getPostAuthRedirect(user: StoredUser): string {
   return user.role === 'buyer' ? '/marketplace' : '/dashboard';
 }
 
+function isJwtExpired(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]!.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  if (isJwtExpired(token)) {
+    clearSession();
+    return null;
+  }
+  return token;
 }
 
 export function getUser(): StoredUser | null {
@@ -50,11 +65,14 @@ export function getSession(): SessionState {
 export function saveSession(token: string, user: StoredUser): void {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  // Also persist to a cookie so Next.js middleware can enforce server-side auth
+  document.cookie = `trace_auth=${token}; path=/; SameSite=Strict`;
 }
 
 export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  document.cookie = 'trace_auth=; path=/; max-age=0';
 }
 
 export function isHubStaff(user: StoredUser | null): boolean {

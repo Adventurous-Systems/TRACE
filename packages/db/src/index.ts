@@ -11,6 +11,7 @@ export {
   transactions,
   qualityReports,
   sensorReadings,
+  feedbackSubmissions,
 } from '../drizzle/schema.js';
 
 export type {
@@ -32,4 +33,6 @@ export type {
   NewQualityReport,
   SensorReading,
   NewSensorReading,
+  FeedbackSubmission,
+  NewFeedbackSubmission,
 } from '../drizzle/schema.js';

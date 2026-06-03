@@ -44,28 +44,30 @@ export async function createPassport(
 
   if (!passport) throw new Error('Failed to insert passport');
 
-  // Generate QR code pointing to the public passport URL
   const publicUrl = `${env.WEB_URL}/passport/${passport.id}`;
-  const qrBuffer = await QRCode.toBuffer(publicUrl, {
-    type: 'png',
-    width: 400,
-    margin: 2,
-    errorCorrectionLevel: 'H',
-  });
+  let qrCodeUrl: string | undefined;
 
-  const qrKey = `passports/${passport.id}/qr.png`;
-  const qrCodeUrl = await uploadBuffer(
-    env.MINIO_BUCKET_PASSPORTS,
-    qrKey,
-    qrBuffer,
-    'image/png',
-  );
+  if (env.NODE_ENV !== 'test') {
+    const qrBuffer = await QRCode.toBuffer(publicUrl, {
+      type: 'png',
+      width: 400,
+      margin: 2,
+      errorCorrectionLevel: 'H',
+    });
+    const qrKey = `passports/${passport.id}/qr.png`;
+    qrCodeUrl = await uploadBuffer(
+      env.MINIO_BUCKET_PASSPORTS,
+      qrKey,
+      qrBuffer,
+      'image/png',
+    );
+  }
 
   // Update with QR code URL and mark as active
   const [updated] = await db
     .update(materialPassports)
     .set({
-      qrCodeUrl,
+      qrCodeUrl: qrCodeUrl ?? null,
       digitalLinkUri: publicUrl,
       status: 'active',
       updatedAt: new Date(),
@@ -291,4 +293,38 @@ function buildInsertValues(input: CreatePassportInput | UpdatePassportInput): In
     hazardousSubstances: (input.hazardousSubstances ?? []) as unknown,
     customAttributes: (input.customAttributes ?? {}) as unknown,
   };
+}
+
+// ─── Upload photo ─────────────────────────────────────────────────────────────
+
+export async function uploadPassportPhoto(
+  passportId: string,
+  buffer: Buffer,
+  mimetype: string,
+  organisationId: string,
+): Promise<MaterialPassport> {
+  const passport = await db.query.materialPassports.findFirst({
+    where: eq(materialPassports.id, passportId),
+  });
+
+  if (!passport) throw new NotFoundError(`Passport ${passportId} not found`);
+  if (passport.organisationId !== organisationId) throw new ForbiddenError('Access denied');
+
+  const ext = mimetype.split('/')[1] ?? 'jpg';
+  const key = `passports/${passportId}/photos/${Date.now()}.${ext}`;
+  const photoUrl = await uploadBuffer(env.MINIO_BUCKET_PASSPORTS, key, buffer, mimetype);
+
+  const existing = (passport.conditionPhotos ?? []) as string[];
+
+  const [updated] = await db
+    .update(materialPassports)
+    .set({
+      conditionPhotos: [...existing, photoUrl] as string[],
+      updatedAt: new Date(),
+    })
+    .where(eq(materialPassports.id, passportId))
+    .returning();
+
+  if (!updated) throw new Error('Failed to update passport photos');
+  return updated;
 }

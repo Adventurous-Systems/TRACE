@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { passports, quality, type PassportDetail, type QualityReportSummary } from '@/lib/api-client';
-import { getToken } from '@/lib/auth';
+import { getToken, isHubStaff, getUser } from '@/lib/auth';
 
 const GRADE_COLORS: Record<string, string> = {
   A: 'bg-green-100 text-green-800',
@@ -24,6 +24,11 @@ export default function PassportDetailPage() {
   const [qualityReports, setQualityReports] = useState<QualityReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const user = getUser();
+  const canEdit = isHubStaff(user);
 
   useEffect(() => {
     const token = getToken();
@@ -63,6 +68,24 @@ export default function PassportDetailPage() {
   }
 
   const anchored = !!passport.blockchainTxHash;
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const token = getToken();
+    if (!token) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const updated = await passports.uploadPhoto(id, file, token);
+      setPassport(updated);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -124,6 +147,52 @@ export default function PassportDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Condition photos */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Condition photos</CardTitle>
+              {canEdit && (
+                <div className="flex items-center gap-2">
+                  {uploadError && <span className="text-xs text-red-500">{uploadError}</span>}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic"
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {uploading ? 'Uploading…' : '+ Add photo'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {passport.conditionPhotos.length === 0 ? (
+              <p className="text-sm text-gray-500">No photos uploaded yet.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {passport.conditionPhotos.map((url, i) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={url}
+                      alt={`Condition photo ${i + 1}`}
+                      className="w-full h-28 object-cover rounded-lg border hover:opacity-90 transition-opacity"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Blockchain status */}
         <Card>

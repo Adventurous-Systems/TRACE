@@ -193,7 +193,7 @@ export const passportEvents = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     passportId: uuid('passport_id')
       .notNull()
-      .references(() => materialPassports.id),
+      .references(() => materialPassports.id, { onDelete: 'cascade' }),
     eventType: text('event_type').notNull(), // EPCIS 2.0 vocabulary
     eventData: jsonb('event_data').$type<Record<string, unknown>>().notNull(),
     actorId: uuid('actor_id').references(() => users.id),
@@ -214,7 +214,7 @@ export const listings = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     passportId: uuid('passport_id')
       .notNull()
-      .references(() => materialPassports.id),
+      .references(() => materialPassports.id, { onDelete: 'cascade' }),
     organisationId: uuid('organisation_id')
       .notNull()
       .references(() => organisations.id),
@@ -258,7 +258,7 @@ export const transactions = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     listingId: uuid('listing_id')
       .notNull()
-      .references(() => listings.id),
+      .references(() => listings.id, { onDelete: 'cascade' }),
     buyerId: uuid('buyer_id')
       .notNull()
       .references(() => users.id),
@@ -291,7 +291,7 @@ export const qualityReports = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     passportId: uuid('passport_id')
       .notNull()
-      .references(() => materialPassports.id),
+      .references(() => materialPassports.id, { onDelete: 'cascade' }),
     inspectorId: uuid('inspector_id')
       .notNull()
       .references(() => users.id),
@@ -322,7 +322,7 @@ export const sensorReadings = pgTable(
   'sensor_readings',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    passportId: uuid('passport_id').references(() => materialPassports.id),
+    passportId: uuid('passport_id').references(() => materialPassports.id, { onDelete: 'cascade' }),
     deviceId: text('device_id').notNull(),
     sensorType: text('sensor_type').notNull(),
     readingValue: jsonb('reading_value').$type<Record<string, unknown>>().notNull(),
@@ -338,6 +338,28 @@ export const sensorReadings = pgTable(
 
 export type SensorReading = typeof sensorReadings.$inferSelect;
 export type NewSensorReading = typeof sensorReadings.$inferInsert;
+
+// ── Feedback Submissions ─────────────────────────────────────────────────────
+
+export const feedbackSubmissions = pgTable(
+  'feedback_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').references(() => users.id),
+    rating: integer('rating').notNull(), // 1–5
+    category: text('category').notNull(), // bug | ux | feature | general
+    message: text('message').notNull(),
+    pageUrl: text('page_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_feedback_user').on(table.userId),
+    index('idx_feedback_created').on(table.createdAt),
+  ],
+);
+
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+export type NewFeedbackSubmission = typeof feedbackSubmissions.$inferInsert;
 
 // ── Relations ────────────────────────────────────────────────────────────────
 
@@ -358,6 +380,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   listings: many(listings),
   buyerTransactions: many(transactions, { relationName: 'buyer' }),
   sellerTransactions: many(transactions, { relationName: 'seller' }),
+  feedbackSubmissions: many(feedbackSubmissions),
 }));
 
 export const betaAccessRequestsRelations = relations(betaAccessRequests, ({ one }) => ({
@@ -451,5 +474,12 @@ export const sensorReadingsRelations = relations(sensorReadings, ({ one }) => ({
   passport: one(materialPassports, {
     fields: [sensorReadings.passportId],
     references: [materialPassports.id],
+  }),
+}));
+
+export const feedbackSubmissionsRelations = relations(feedbackSubmissions, ({ one }) => ({
+  user: one(users, {
+    fields: [feedbackSubmissions.userId],
+    references: [users.id],
   }),
 }));

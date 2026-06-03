@@ -415,7 +415,7 @@ export const marketplace = {
       token,
     }),
 
-  makeOffer: (data: { listingId: string; offerPencE?: number; notes?: string }, token: string) =>
+  makeOffer: (data: { listingId: string; offerPence?: number; notes?: string }, token: string) =>
     request<MarketplaceTransaction>('/api/v1/marketplace/offers', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -509,4 +509,45 @@ export const passports = {
 
   history: (id: string) =>
     request<unknown[]>(`/api/v1/passports/${id}/history`),
+
+  uploadPhoto: async (id: string, file: File, token: string): Promise<PassportDetail> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const apiBase = process.env['NEXT_PUBLIC_API_URL'] ?? '';
+    const response = await fetch(`${apiBase}/api/v1/passports/${id}/photos`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: { message: 'Upload failed' } })) as { error?: { message?: string } };
+      throw new Error(err.error?.message ?? 'Upload failed');
+    }
+    const json = await response.json() as { data: PassportDetail };
+    return json.data;
+  },
+};
+
+// ─── Feedback ─────────────────────────────────────────────────────────────
+
+export interface FeedbackEntry {
+  id: string;
+  userId: string | null;
+  rating: number;
+  category: 'bug' | 'ux' | 'feature' | 'general';
+  message: string;
+  pageUrl: string | null;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+}
+
+export const feedback = {
+  submit: (data: { rating: number; category: string; message: string; pageUrl?: string }) =>
+    request<FeedbackEntry>('/api/v1/feedback', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: (token: string) =>
+    request<FeedbackEntry[]>('/api/v1/feedback', { token }),
 };

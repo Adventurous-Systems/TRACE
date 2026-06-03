@@ -15,6 +15,20 @@
       "when": 1775665000000,
       "tag": "0001_beta_access_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780059764230,
+      "tag": "0002_cultured_overlord",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780062094208,
+      "tag": "0003_warm_cargill",
+      "breakpoints": true
     }
   ]
 }

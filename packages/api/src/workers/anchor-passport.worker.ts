@@ -2,11 +2,12 @@
  * Blockchain anchoring worker.
  *
  * Flow:
- *   1. Receive { passportId, organisationId } from the anchor-passport BullMQ queue
+ *   1. Receive { passportId } from the anchor-passport BullMQ queue
  *   2. Load the full passport from the DB
  *   3. Serialise to canonical JSON-LD
  *   4. Compute keccak256 hash
  *   5. Submit to MaterialRegistry.registerPassport() on VeChainThor
+ *      — uses VIP-191 fee delegation when FEE_DELEGATOR_URL is set
  *   6. Poll for tx confirmation
  *   7. Write blockchain_tx_hash, blockchain_passport_hash, blockchain_anchored_at back to DB
  */
@@ -16,7 +17,8 @@ import { eq } from 'drizzle-orm';
 import { db, materialPassports, type MaterialPassport } from '@trace/db';
 import { createLogger } from '@trace/core';
 import { ThorClient } from '@vechain/sdk-network';
-import { keccak256, Interface, Wallet } from 'ethers';
+import { Transaction, Address, Hex } from '@vechain/sdk-core';
+import { keccak256, Interface } from 'ethers';
 import { env } from '../env.js';
 import { redisConnection, type AnchorPassportJob } from '../lib/queue.js';
 
@@ -109,14 +111,18 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
   }
 
   if (!env.MATERIAL_REGISTRY_ADDRESS) {
-    logger.warn({ passportId }, 'MATERIAL_REGISTRY_ADDRESS not set — skipping blockchain anchor');
-    return;
+    throw new Error('MATERIAL_REGISTRY_ADDRESS is not configured — blockchain anchoring cannot proceed');
   }
 
-  if (!process.env['DEPLOYER_PRIVATE_KEY']) {
-    logger.warn({ passportId }, 'DEPLOYER_PRIVATE_KEY not set — skipping blockchain anchor');
-    return;
+  const deployerPrivKeyRaw = process.env['DEPLOYER_PRIVATE_KEY'];
+  if (!deployerPrivKeyRaw) {
+    throw new Error('DEPLOYER_PRIVATE_KEY is not configured — blockchain anchoring cannot proceed');
   }
+
+  // Convert hex private key to bytes
+  const privKeyHex = deployerPrivKeyRaw.startsWith('0x') ? deployerPrivKeyRaw.slice(2) : deployerPrivKeyRaw;
+  const senderPrivKeyBytes = Hex.of(privKeyHex).bytes;
+  const senderAddress = Address.ofPrivateKey(senderPrivKeyBytes).toString();
 
   // Compute hash
   const jsonLd = buildCanonicalJsonLd(passport);
@@ -134,28 +140,66 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
     metadataUri,
   ]);
 
-  // Submit via ThorClient
+  const clauses = [
+    {
+      to: env.MATERIAL_REGISTRY_ADDRESS,
+      value: '0x0',
+      data: callData,
+    },
+  ];
+
   const thorClient = getThorClient();
-  const wallet = new Wallet(process.env['DEPLOYER_PRIVATE_KEY']!);
+  const isDelegated = !!env.FEE_DELEGATOR_URL;
 
   try {
+    // Estimate gas for accurate fee calculation
+    const gasEstimate = await thorClient.transactions.estimateGas(clauses, senderAddress);
+    const gasWithBuffer = Math.ceil(gasEstimate.totalGas * 1.2); // 20% buffer
+
+    // Build transaction body
     const txBody = await thorClient.transactions.buildTransactionBody(
-      [
-        {
-          to: env.MATERIAL_REGISTRY_ADDRESS,
-          value: '0x0',
-          data: callData,
-        },
-      ],
-      0,
+      clauses,
+      gasWithBuffer,
+      { isDelegated },
     );
 
-    const rawTx = await wallet.signTransaction({
-      ...txBody,
-      chainId: txBody.chainTag,
-    } as Parameters<typeof wallet.signTransaction>[0]);
+    // Create transaction and sign as sender
+    const tx = Transaction.of(txBody);
+    const senderSignedTx = tx.signAsSender(senderPrivKeyBytes);
 
-    const { id: txId } = await thorClient.transactions.sendRawTransaction(rawTx);
+    let finalTx: Transaction;
+
+    if (isDelegated && env.FEE_DELEGATOR_URL) {
+      // VIP-191: get gas payer signature from remote delegator
+      const rawUnsignedTx = '0x' + Buffer.from(tx.encoded).toString('hex');
+
+      const delegatorResponse = await fetch(env.FEE_DELEGATOR_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: rawUnsignedTx, origin: senderAddress }),
+      });
+
+      if (!delegatorResponse.ok) {
+        const body = await delegatorResponse.text();
+        throw new Error(`Fee delegator returned ${delegatorResponse.status}: ${body}`);
+      }
+
+      const { signature: gasPayerSigHex } = await delegatorResponse.json() as { signature: string };
+
+      // Combine sender sig (65 bytes) + gas payer sig (65 bytes)
+      const senderSig = senderSignedTx.signature!;
+      const gasPayerSigClean = gasPayerSigHex.startsWith('0x') ? gasPayerSigHex.slice(2) : gasPayerSigHex;
+      const gasPayerSig = Hex.of(gasPayerSigClean).bytes;
+      const combinedSig = new Uint8Array([...senderSig, ...gasPayerSig]);
+
+      finalTx = Transaction.of(txBody, combinedSig);
+      logger.info({ passportId, delegatorUrl: env.FEE_DELEGATOR_URL }, 'Fee delegation applied');
+    } else {
+      finalTx = senderSignedTx;
+    }
+
+    const rawFinalTx = '0x' + Buffer.from(finalTx.encoded).toString('hex');
+    const { id: txId } = await thorClient.transactions.sendRawTransaction(rawFinalTx);
     logger.info({ passportId, txId }, 'Transaction submitted');
 
     // Poll for confirmation (up to 60s)
@@ -191,9 +235,19 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
   }
 }
 
+// ─── Startup validation ───────────────────────────────────────────────────
+
+function validateAnchorConfig(): void {
+  if (!env.MATERIAL_REGISTRY_ADDRESS) return; // anchoring disabled — fine
+  if (!env.VECHAIN_NODE_URL) throw new Error('VECHAIN_NODE_URL is required when MATERIAL_REGISTRY_ADDRESS is set');
+  if (!process.env['DEPLOYER_PRIVATE_KEY']) throw new Error('DEPLOYER_PRIVATE_KEY is required when MATERIAL_REGISTRY_ADDRESS is set');
+}
+
 // ─── Worker bootstrap ─────────────────────────────────────────────────────
 
 export function startAnchorWorker() {
+  validateAnchorConfig();
+
   const worker = new Worker<AnchorPassportJob>(
     'anchor-passport',
     processAnchorJob,
@@ -214,6 +268,6 @@ export function startAnchorWorker() {
     );
   });
 
-  logger.info('Anchor passport worker started');
+  logger.info({ delegationEnabled: !!env.FEE_DELEGATOR_URL }, 'Anchor passport worker started');
   return worker;
 }

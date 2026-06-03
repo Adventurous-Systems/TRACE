@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getUser, clearSession, type StoredUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import FeedbackWidget from '@/components/FeedbackWidget';
 
 interface Props {
   children: React.ReactNode;
@@ -40,8 +41,9 @@ export default function DashboardLayout({ children }: Props) {
     { href: '/scan', label: 'Scan QR' },
   ];
 
-  if (user.role === 'platform_admin') {
+  if (user.role === 'platform_admin' || user.role === 'hub_admin') {
     navLinks.push({ href: '/admin/access-requests', label: 'Access Requests' });
+    navLinks.push({ href: '/admin/feedback', label: 'Feedback' });
   }
 
   return (
@@ -80,6 +82,7 @@ export default function DashboardLayout({ children }: Props) {
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+      <FeedbackWidget />
     </div>
   );
 }

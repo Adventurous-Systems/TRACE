@@ -12,5 +12,5 @@ export interface QualityReport {
   photoUrls: string[];
   blockchainTxHash: string | null;
   disputed: boolean;
-  createdAt: string;
+  createdAt: Date;
 }

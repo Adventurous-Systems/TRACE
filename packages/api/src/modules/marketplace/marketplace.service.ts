@@ -1,10 +1,11 @@
-import { eq, and, gte, lte, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, or, ilike, gte, lte, desc, asc, sql } from 'drizzle-orm';
 import {
   db,
   listings,
   transactions,
   materialPassports,
   passportEvents,
+  organisations,
   type Listing,
   type Transaction,
 } from '@trace/db';
@@ -18,6 +19,8 @@ import {
   ForbiddenError,
   ConflictError,
 } from '@trace/core';
+
+type TransactionWithListing = Transaction & { listing: Listing };
 
 // ─── Listing: Create ─────────────────────────────────────────────────────────
 
@@ -51,8 +54,7 @@ export async function createListing(
       pricePence: input.pricePence,
       currency: input.currency,
       quantity: input.quantity,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      shippingOptions: input.shippingOptions as any,
+      shippingOptions: input.shippingOptions as Array<{ method: string; deliveryRadiusMiles?: number; deliveryCostPence?: number; notes?: string }>,
       status: 'active',
       expiresAt: input.expiresAt ?? null,
     })
@@ -129,83 +131,112 @@ export async function getListingById(listingId: string): Promise<ListingWithPass
 export async function searchListings(
   query: MarketplaceQueryInput,
 ): Promise<{ data: ListingWithPassport[]; total: number; page: number; limit: number }> {
-  // Build conditions on the join result — we query listings + join passport data
+  // All filters pushed into SQL — no in-memory post-filtering
   const conditions = [eq(listings.status, 'active')];
 
-  if (query.minPricePence !== undefined) {
-    conditions.push(gte(listings.pricePence, query.minPricePence));
-  }
-  if (query.maxPricePence !== undefined) {
-    conditions.push(lte(listings.pricePence, query.maxPricePence));
+  if (query.minPricePence !== undefined) conditions.push(gte(listings.pricePence, query.minPricePence));
+  if (query.maxPricePence !== undefined) conditions.push(lte(listings.pricePence, query.maxPricePence));
+  if (query.categoryL1) conditions.push(eq(materialPassports.categoryL1, query.categoryL1));
+  if (query.categoryL2) conditions.push(eq(materialPassports.categoryL2, query.categoryL2));
+  if (query.conditionGrade) conditions.push(eq(materialPassports.conditionGrade, query.conditionGrade));
+  if (query.hubSlug) conditions.push(eq(organisations.slug, query.hubSlug));
+  if (query.q) {
+    const pattern = `%${query.q}%`;
+    conditions.push(
+      or(
+        ilike(materialPassports.productName, pattern),
+        ilike(materialPassports.categoryL1, pattern),
+        ilike(materialPassports.conditionNotes, pattern),
+      )!,
+    );
   }
 
   const where = and(...conditions);
   const offset = (query.page - 1) * query.limit;
 
-  // Sort column mapping
   const sortColMap = {
     createdAt: listings.createdAt,
     pricePence: listings.pricePence,
-    carbonSavingsVsNew: listings.createdAt, // fallback; carbon is on passport side
+    carbonSavingsVsNew: materialPassports.carbonSavingsVsNew,
   } as const;
   const sortCol = sortColMap[query.sortBy] ?? listings.createdAt;
   const orderFn = query.sortOrder === 'asc' ? asc : desc;
 
-  const [data, countResult] = await Promise.all([
-    db.query.listings.findMany({
-      where,
-      orderBy: [orderFn(sortCol)],
-      limit: query.limit,
-      offset,
-      with: {
-        passport: {
-          columns: {
-            productName: true,
-            categoryL1: true,
-            categoryL2: true,
-            conditionGrade: true,
-            conditionNotes: true,
-            carbonSavingsVsNew: true,
-            qrCodeUrl: true,
-          },
-        },
-        organisation: {
-          columns: { name: true, slug: true },
-        },
-      },
-    }),
-    db.select({ count: sql<number>`cast(count(*) as int)` }).from(listings).where(where),
+  const baseQuery = db
+    .select({
+      // All listing columns
+      id: listings.id,
+      passportId: listings.passportId,
+      organisationId: listings.organisationId,
+      sellerId: listings.sellerId,
+      pricePence: listings.pricePence,
+      currency: listings.currency,
+      quantity: listings.quantity,
+      shippingOptions: listings.shippingOptions,
+      status: listings.status,
+      blockchainTxHash: listings.blockchainTxHash,
+      expiresAt: listings.expiresAt,
+      createdAt: listings.createdAt,
+      // Passport fields
+      passportProductName: materialPassports.productName,
+      passportCategoryL1: materialPassports.categoryL1,
+      passportCategoryL2: materialPassports.categoryL2,
+      passportConditionGrade: materialPassports.conditionGrade,
+      passportConditionNotes: materialPassports.conditionNotes,
+      passportCarbonSavingsVsNew: materialPassports.carbonSavingsVsNew,
+      passportQrCodeUrl: materialPassports.qrCodeUrl,
+      // Organisation fields
+      orgName: organisations.name,
+      orgSlug: organisations.slug,
+    })
+    .from(listings)
+    .innerJoin(materialPassports, eq(listings.passportId, materialPassports.id))
+    .innerJoin(organisations, eq(listings.organisationId, organisations.id));
+
+  const [rows, countResult] = await Promise.all([
+    baseQuery
+      .where(where)
+      .orderBy(orderFn(sortCol))
+      .limit(query.limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`cast(count(*) as int)` })
+      .from(listings)
+      .innerJoin(materialPassports, eq(listings.passportId, materialPassports.id))
+      .innerJoin(organisations, eq(listings.organisationId, organisations.id))
+      .where(where),
   ]);
 
-  // Post-filter by passport fields (categoryL1, categoryL2, conditionGrade, q, hubSlug)
-  // Drizzle relations don't support WHERE on joined tables in findMany easily;
-  // we filter in-memory for the prototype. Production would use raw SQL.
-  let filtered = data as unknown as ListingWithPassport[];
-
-  if (query.categoryL1) {
-    filtered = filtered.filter((l) => l.passport.categoryL1 === query.categoryL1);
-  }
-  if (query.categoryL2) {
-    filtered = filtered.filter((l) => l.passport.categoryL2 === query.categoryL2);
-  }
-  if (query.conditionGrade) {
-    filtered = filtered.filter((l) => l.passport.conditionGrade === query.conditionGrade);
-  }
-  if (query.hubSlug) {
-    filtered = filtered.filter((l) => l.organisation.slug === query.hubSlug);
-  }
-  if (query.q) {
-    const q = query.q.toLowerCase();
-    filtered = filtered.filter(
-      (l) =>
-        l.passport.productName.toLowerCase().includes(q) ||
-        l.passport.categoryL1.toLowerCase().includes(q) ||
-        (l.passport.conditionNotes ?? '').toLowerCase().includes(q),
-    );
-  }
+  const data: ListingWithPassport[] = rows.map((row) => ({
+    id: row.id,
+    passportId: row.passportId,
+    organisationId: row.organisationId,
+    sellerId: row.sellerId,
+    pricePence: row.pricePence,
+    currency: row.currency,
+    quantity: row.quantity,
+    shippingOptions: row.shippingOptions,
+    status: row.status,
+    blockchainTxHash: row.blockchainTxHash,
+    expiresAt: row.expiresAt,
+    createdAt: row.createdAt,
+    passport: {
+      productName: row.passportProductName,
+      categoryL1: row.passportCategoryL1,
+      categoryL2: row.passportCategoryL2,
+      conditionGrade: row.passportConditionGrade,
+      conditionNotes: row.passportConditionNotes,
+      carbonSavingsVsNew: row.passportCarbonSavingsVsNew,
+      qrCodeUrl: row.passportQrCodeUrl,
+    },
+    organisation: {
+      name: row.orgName,
+      slug: row.orgSlug,
+    },
+  }));
 
   return {
-    data: filtered,
+    data,
     total: countResult[0]?.count ?? 0,
     page: query.page,
     limit: query.limit,
@@ -331,7 +362,7 @@ export async function makeOffer(
     throw new ConflictError('Listing has expired');
   }
 
-  const amountPence = input.offerPencE ?? listing.pricePence;
+  const amountPence = input.offerPence ?? listing.pricePence;
 
   // Dispute deadline: 48 hours after offer
   const disputeDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -373,12 +404,13 @@ export async function updateTransaction(
   input: UpdateTransactionInput,
   userId: string,
 ): Promise<Transaction> {
-  const tx = await db.query.transactions.findFirst({
+  const txRaw = await db.query.transactions.findFirst({
     where: eq(transactions.id, transactionId),
     with: { listing: true },
   });
 
-  if (!tx) throw new NotFoundError(`Transaction ${transactionId} not found`);
+  if (!txRaw) throw new NotFoundError(`Transaction ${transactionId} not found`);
+  const tx = txRaw as TransactionWithListing;
 
   // Permission checks by action
   if (input.action === 'confirm_delivery' && tx.buyerId !== userId) {
@@ -425,7 +457,7 @@ export async function updateTransaction(
       await db
         .update(materialPassports)
         .set({ status: 'listed', updatedAt: new Date() })
-        .where(eq(materialPassports.id, (tx as any).listing.passportId));
+        .where(eq(materialPassports.id, tx.listing.passportId));
       break;
 
     default:
@@ -447,11 +479,11 @@ export async function updateTransaction(
     await db
       .update(materialPassports)
       .set({ status: 'sold', updatedAt: new Date() })
-      .where(eq(materialPassports.id, (tx as any).listing.passportId));
+      .where(eq(materialPassports.id, tx.listing.passportId));
 
     // EPCIS transfer event
     await db.insert(passportEvents).values({
-      passportId: (tx as any).listing.passportId,
+      passportId: tx.listing.passportId,
       eventType: 'TransactionEvent',
       eventData: {
         action: 'ADD',
