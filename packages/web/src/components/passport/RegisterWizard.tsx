@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { passports } from '@/lib/api-client';
+import { passports, type PassportCertificate } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
 
 // ─── Wizard steps ────────────────────────────────────────────────────────────
@@ -21,6 +21,7 @@ const STEPS = [
   { id: 'circular', label: 'Circular data' },
   { id: 'environmental', label: 'Environmental' },
   { id: 'review', label: 'Review & submit' },
+  { id: 'verification', label: 'Verification' },
 ] as const;
 
 type StepId = (typeof STEPS)[number]['id'];
@@ -71,6 +72,9 @@ export default function RegisterWizard() {
   const router = useRouter();
   const [step, setStep] = useState<StepId>('basic');
   const [error, setError] = useState<string | null>(null);
+  const [createdPassportId, setCreatedPassportId] = useState<string | null>(null);
+  const [certificate, setCertificate] = useState<PassportCertificate | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
 
   const {
     register,
@@ -106,6 +110,40 @@ export default function RegisterWizard() {
       }
     }
   }, [setValue]);
+
+  useEffect(() => {
+    if (!createdPassportId || step !== 'verification') return;
+    let cancelled = false;
+
+    async function pollCertificate() {
+      try {
+        const next = await passports.certificate(createdPassportId!);
+        if (!cancelled) {
+          setCertificate(next);
+          setVerificationError(null);
+        }
+        return next.status;
+      } catch (err) {
+        if (!cancelled) {
+          setVerificationError(err instanceof Error ? err.message : 'Unable to load verification status');
+        }
+        return 'pending';
+      }
+    }
+
+    pollCertificate();
+    const interval = window.setInterval(async () => {
+      const status = await pollCertificate();
+      if (status === 'verified' || status === 'failed') {
+        window.clearInterval(interval);
+      }
+    }, 3500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [createdPassportId, step]);
 
   const currentIndex = STEPS.findIndex((s) => s.id === step);
 
@@ -167,7 +205,9 @@ export default function RegisterWizard() {
 
       const passport = await passports.create(payload, token);
       localStorage.removeItem(STORAGE_KEY);
-      router.push(`/passports/${passport.id}`);
+      setCreatedPassportId(passport.id);
+      setCertificate(null);
+      setStep('verification');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     }
@@ -590,22 +630,99 @@ export default function RegisterWizard() {
         </Card>
       )}
 
+      {step === 'verification' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Verification</CardTitle>
+            <CardDescription>
+              TRACE is registering the passport fingerprint on VeChainThor.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="rounded-lg border bg-white p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 w-2/3 rounded bg-gray-100" />
+                  <div className="h-3 w-1/2 rounded bg-gray-100" />
+                  <div className="h-3 w-5/6 rounded bg-gray-100" />
+                </div>
+                <div
+                  className={`h-10 w-10 rounded-full ${
+                    certificate?.status === 'verified'
+                      ? 'bg-green-100'
+                      : certificate?.status === 'failed'
+                        ? 'bg-red-100'
+                        : 'bg-yellow-100 animate-pulse'
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div
+              className={`rounded-md border px-3 py-2 text-sm ${
+                certificate?.status === 'verified'
+                  ? 'border-green-200 bg-green-50 text-green-700'
+                  : certificate?.status === 'failed'
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-yellow-200 bg-yellow-50 text-yellow-800'
+              }`}
+            >
+              {certificate?.status === 'verified'
+                ? 'Blockchain certificate is ready.'
+                : certificate?.status === 'failed'
+                  ? certificate.failureReason ?? 'Verification failed. The passport is saved and can be retried.'
+                  : 'Pending verification. You can keep this page open, or open the passport now.'}
+            </div>
+
+            {verificationError && (
+              <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+                {verificationError}
+              </div>
+            )}
+
+            {certificate?.certificateHash && (
+              <dl className="text-sm space-y-2">
+                <div className="flex gap-4">
+                  <dt className="text-gray-500 w-32 shrink-0">Certificate hash</dt>
+                  <dd className="font-mono text-xs break-all">{certificate.certificateHash}</dd>
+                </div>
+              </dl>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Navigation */}
       <div className="flex items-center justify-between mt-6">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={goPrev}
-          disabled={currentIndex === 0}
-        >
-          Back
-        </Button>
-
-        {step !== 'review' ? (
+        {step === 'verification' ? (
+          <>
+            <Button type="button" variant="outline" onClick={() => router.push('/passports')}>
+              Back to passports
+            </Button>
+            <Button
+              type="button"
+              className="bg-brand-600 hover:bg-brand-700"
+              onClick={() => createdPassportId && router.push(`/passports/${createdPassportId}`)}
+              disabled={!createdPassportId}
+            >
+              {certificate?.status === 'verified' ? 'Open verified passport' : 'Open passport anyway'}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={goPrev}
+              disabled={currentIndex === 0}
+            >
+              Back
+            </Button>
+            {step !== 'review' ? (
           <Button type="button" onClick={goNext} className="bg-brand-600 hover:bg-brand-700">
             Continue
           </Button>
-        ) : (
+            ) : (
           <Button
             type="submit"
             disabled={isSubmitting}
@@ -613,6 +730,8 @@ export default function RegisterWizard() {
           >
             {isSubmitting ? 'Registering…' : 'Register material'}
           </Button>
+            )}
+          </>
         )}
       </div>
     </form>

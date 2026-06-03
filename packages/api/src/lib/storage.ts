@@ -45,6 +45,6 @@ export async function uploadBuffer(
   await minioClient.putObject(bucket, key, buffer, buffer.length, {
     'Content-Type': contentType,
   });
-  const baseUrl = `http://${env.MINIO_ENDPOINT}:${env.MINIO_PORT}`;
+  const baseUrl = env.MINIO_PUBLIC_URL ?? `http://${env.MINIO_ENDPOINT}:${env.MINIO_PORT}`;
   return `${baseUrl}/${bucket}/${key}`;
 }

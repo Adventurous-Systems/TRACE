@@ -10,13 +10,16 @@ concurrency:
   group: deploy-staging
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Deploy staging over SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         with:
           host: ${{ secrets.TRACE_STAGING_SSH_HOST }}
           username: ${{ secrets.TRACE_STAGING_SSH_USER }}

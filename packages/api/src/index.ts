@@ -6,8 +6,10 @@ import { startAnchorWorker } from './workers/anchor-passport.worker.js';
 async function main() {
   const app = await buildApp();
 
-  // Start background workers
-  startAnchorWorker();
+  // Start background workers (not in test environment — avoids hanging Redis connections)
+  if (env.NODE_ENV !== 'test') {
+    startAnchorWorker();
+  }
 
   await app.listen({
     port: env.API_PORT,

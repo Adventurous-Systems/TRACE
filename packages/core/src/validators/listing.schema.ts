@@ -29,7 +29,7 @@ export type UpdateListingInput = z.infer<typeof UpdateListingSchema>;
 
 export const MakeOfferSchema = z.object({
   listingId: z.string().uuid(),
-  offerPencE: z.number().int().positive().optional(), // if absent, accepts asking price
+  offerPence: z.number().int().positive().optional(), // if absent, accepts asking price
   notes: z.string().max(500).optional(),
 });
 

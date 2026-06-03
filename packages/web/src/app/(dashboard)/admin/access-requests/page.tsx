@@ -269,8 +269,8 @@ export default function AdminAccessRequestsPage() {
         {
           requestedRole: draft.requestedRole,
           organisationName: draft.organisationName.trim(),
-          notes: draft.notes.trim() || undefined,
-          reviewNotes: draft.reviewNotes.trim() || undefined,
+          ...(draft.notes.trim() ? { notes: draft.notes.trim() } : {}),
+          ...(draft.reviewNotes.trim() ? { reviewNotes: draft.reviewNotes.trim() } : {}),
         },
         token,
       );
@@ -298,7 +298,7 @@ export default function AdminAccessRequestsPage() {
         {
           role: draft.requestedRole,
           organisationName: draft.organisationName.trim(),
-          reviewNotes: draft.reviewNotes.trim() || undefined,
+          ...(draft.reviewNotes.trim() ? { reviewNotes: draft.reviewNotes.trim() } : {}),
         },
         token,
       );
@@ -320,7 +320,7 @@ export default function AdminAccessRequestsPage() {
       await accessRequests.reject(
         requestId,
         {
-          reviewNotes: draft?.reviewNotes.trim() || undefined,
+          ...(draft?.reviewNotes.trim() ? { reviewNotes: draft.reviewNotes.trim() } : {}),
         },
         token,
       );
@@ -349,9 +349,9 @@ export default function AdminAccessRequestsPage() {
         requestId,
         {
           role: draft.role,
-          organisationId: draft.role === 'buyer' ? undefined : draft.organisationId || undefined,
-          organisationName: draft.role === 'buyer' ? undefined : draft.organisationName.trim() || undefined,
-          reviewNotes: draft.reviewNotes.trim() || undefined,
+          ...(draft.role !== 'buyer' && draft.organisationId ? { organisationId: draft.organisationId } : {}),
+          ...(draft.role !== 'buyer' && draft.organisationName.trim() ? { organisationName: draft.organisationName.trim() } : {}),
+          ...(draft.reviewNotes.trim() ? { reviewNotes: draft.reviewNotes.trim() } : {}),
         },
         token,
       );

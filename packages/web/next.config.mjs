@@ -9,6 +9,8 @@ const nextConfig = {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost' },
       { protocol: 'https', hostname: '*.trace.construction' },
+      { protocol: 'https', hostname: 'trace-staging.adventurous.systems' },
+      { protocol: 'https', hostname: 'trace.adventurous.systems' },
     ],
   },
   webpack(config) {

@@ -139,6 +139,7 @@ export interface AccessRequestReview extends AccessRequest {
     slug: string;
     type: string;
     verified: boolean;
+    blockchainAddress: string | null;
   } | null;
   reviewer?: {
     id: string;
@@ -155,6 +156,7 @@ export interface AccessRequestOrganisation {
   slug: string;
   type: string;
   verified: boolean;
+  blockchainAddress: string | null;
 }
 
 export const auth = {
@@ -183,7 +185,7 @@ export const accessRequests = {
     data: {
       requestedRole: 'hub_staff' | 'hub_admin';
       organisationName: string;
-      notes?: string;
+      notes?: string | undefined;
     },
     token: string,
   ) =>
@@ -212,9 +214,9 @@ export const accessRequests = {
     id: string,
     data: {
       role: 'hub_staff' | 'hub_admin';
-      organisationId?: string;
-      organisationName?: string;
-      reviewNotes?: string;
+      organisationId?: string | undefined;
+      organisationName?: string | undefined;
+      reviewNotes?: string | undefined;
     },
     token: string,
   ) =>
@@ -227,7 +229,7 @@ export const accessRequests = {
   reject: (
     id: string,
     data: {
-      reviewNotes?: string;
+      reviewNotes?: string | undefined;
     },
     token: string,
   ) =>
@@ -242,8 +244,8 @@ export const accessRequests = {
     data: {
       requestedRole: 'hub_staff' | 'hub_admin';
       organisationName: string;
-      notes?: string;
-      reviewNotes?: string;
+      notes?: string | undefined;
+      reviewNotes?: string | undefined;
     },
     token: string,
   ) =>
@@ -257,9 +259,9 @@ export const accessRequests = {
     id: string,
     data: {
       role: 'buyer' | 'hub_staff' | 'hub_admin';
-      organisationId?: string;
-      organisationName?: string;
-      reviewNotes?: string;
+      organisationId?: string | undefined;
+      organisationName?: string | undefined;
+      reviewNotes?: string | undefined;
     },
     token: string,
   ) =>
@@ -330,6 +332,21 @@ export interface PassportDetail extends PassportSummary {
   verified?: boolean;
 }
 
+export interface PassportCertificate {
+  passportId: string;
+  status: 'pending' | 'verified' | 'failed';
+  certificateHash: string | null;
+  certificateId: string | null;
+  txHash: string | null;
+  registeredAt: string | null;
+  blockNumber: number | null;
+  blockId: string | null;
+  hub: { name: string; address: string | null } | null;
+  onchainVerified: boolean | null;
+  failureReason: string | null;
+  lastAttemptAt: string | null;
+}
+
 export interface PassportListResponse {
   data: PassportSummary[];
   total: number;
@@ -391,6 +408,60 @@ export interface MarketplaceTransaction {
   createdAt: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  actorId: string | null;
+  actorRole: string | null;
+  actorEmail: string | null;
+  organisationId: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  status: string;
+  failureReason: string | null;
+  origin: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface BlockchainTransactionLog {
+  id: string;
+  txHash: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  organisationId: string | null;
+  actorId: string | null;
+  originAddress: string | null;
+  gasPayerAddress: string | null;
+  contractAddress: string | null;
+  status: string;
+  gasLimit: number | null;
+  gasUsed: number | null;
+  vthoPaidWei: string | null;
+  blockNumber: number | null;
+  blockId: string | null;
+  failureReason: string | null;
+  metadata: Record<string, unknown>;
+  submittedAt: string | null;
+  confirmedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlockchainTransactionsResponse {
+  items: BlockchainTransactionLog[];
+  summary: {
+    recentSpendWei: string;
+    statusCounts: Record<string, number>;
+    gasPayer: {
+      address: string | null;
+      energyWei: string | null;
+      status: string;
+    };
+  };
+}
+
 export const marketplace = {
   search: (params: URLSearchParams) =>
     request<MarketplaceListResponse>(`/api/v1/marketplace/listings?${params.toString()}`),
@@ -415,7 +486,7 @@ export const marketplace = {
       token,
     }),
 
-  makeOffer: (data: { listingId: string; offerPencE?: number; notes?: string }, token: string) =>
+  makeOffer: (data: { listingId: string; offerPence?: number; notes?: string }, token: string) =>
     request<MarketplaceTransaction>('/api/v1/marketplace/offers', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -431,6 +502,37 @@ export const marketplace = {
       body: JSON.stringify({ action, notes }),
       token,
     }),
+};
+
+export const audit = {
+  events: (token: string, limit = 50) =>
+    request<AuditEvent[]>(`/api/v1/audit/events?limit=${limit}`, { token }),
+
+  blockchainTransactions: (token: string, limit = 50) =>
+    request<BlockchainTransactionsResponse>(
+      `/api/v1/audit/blockchain-transactions?limit=${limit}`,
+      { token },
+    ),
+};
+
+export interface BlockchainTransactionDetail {
+  id: string;
+  status: 'pending' | 'confirmed' | 'failed';
+  transaction: unknown;
+  receipt: {
+    gasUsed?: number;
+    gasPayer?: string;
+    paid?: string;
+    reverted?: boolean;
+    meta?: { blockNumber?: number; blockID?: string; blockTimestamp?: number };
+  } | null;
+  decoded: Record<string, unknown> | null;
+  localLog: BlockchainTransactionLog | null;
+}
+
+export const blockchain = {
+  transaction: (txHash: string) =>
+    request<BlockchainTransactionDetail>(`/api/v1/blockchain/transactions/${txHash}`),
 };
 
 // ─── Quality ──────────────────────────────────────────────────────────────
@@ -493,6 +595,9 @@ export const passports = {
   verify: (id: string) =>
     request<PassportDetail & { verified: boolean }>(`/api/v1/passports/${id}/verify`),
 
+  certificate: (id: string) =>
+    request<PassportCertificate>(`/api/v1/passports/${id}/certificate`),
+
   create: (data: unknown, token: string) =>
     request<PassportDetail>('/api/v1/passports', {
       method: 'POST',
@@ -509,4 +614,45 @@ export const passports = {
 
   history: (id: string) =>
     request<unknown[]>(`/api/v1/passports/${id}/history`),
+
+  uploadPhoto: async (id: string, file: File, token: string): Promise<PassportDetail> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const apiBase = process.env['NEXT_PUBLIC_API_URL'] ?? '';
+    const response = await fetch(`${apiBase}/api/v1/passports/${id}/photos`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: { message: 'Upload failed' } })) as { error?: { message?: string } };
+      throw new Error(err.error?.message ?? 'Upload failed');
+    }
+    const json = await response.json() as { data: PassportDetail };
+    return json.data;
+  },
+};
+
+// ─── Feedback ─────────────────────────────────────────────────────────────
+
+export interface FeedbackEntry {
+  id: string;
+  userId: string | null;
+  rating: number;
+  category: 'bug' | 'ux' | 'feature' | 'general';
+  message: string;
+  pageUrl: string | null;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+}
+
+export const feedback = {
+  submit: (data: { rating: number; category: string; message: string; pageUrl?: string }) =>
+    request<FeedbackEntry>('/api/v1/feedback', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: (token: string) =>
+    request<FeedbackEntry[]>('/api/v1/feedback', { token }),
 };

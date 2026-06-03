@@ -7,6 +7,7 @@ import {
   UpdateTransactionSchema,
 } from '@trace/core';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { recordAuditEvent } from '../../lib/audit.js';
 import {
   createListing,
   getListingById,
@@ -49,6 +50,18 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const listing = await createListing(input, userId, organisationId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'listing.create',
+        resourceType: 'listing',
+        resourceId: listing.id,
+        status: 'succeeded',
+        metadata: {
+          passportId: listing.passportId,
+          pricePence: listing.pricePence,
+          quantity: listing.quantity,
+        },
+      });
       return reply.status(201).send({ success: true, data: listing });
     },
   );
@@ -101,11 +114,27 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
       const body = request.body as Record<string, unknown>;
       if (body['action'] === 'cancel') {
         const listing = await cancelListing(request.params.id, organisationId);
+        await recordAuditEvent({
+          actor: request.user,
+          action: 'listing.cancel',
+          resourceType: 'listing',
+          resourceId: listing.id,
+          status: 'succeeded',
+          metadata: { passportId: listing.passportId },
+        });
         return reply.send({ success: true, data: listing });
       }
 
       const input = UpdateListingSchema.parse(request.body);
       const listing = await updateListing(request.params.id, input, organisationId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'listing.update',
+        resourceType: 'listing',
+        resourceId: listing.id,
+        status: 'succeeded',
+        metadata: { passportId: listing.passportId },
+      });
       return reply.send({ success: true, data: listing });
     },
   );
@@ -120,6 +149,18 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
       const { sub: buyerId } = request.user;
 
       const tx = await makeOffer(input, buyerId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'marketplace.offer',
+        resourceType: 'transaction',
+        resourceId: tx.id,
+        status: 'succeeded',
+        metadata: {
+          listingId: tx.listingId,
+          amountPence: tx.amountPence,
+          buyerModel: request.user.organisationId ? 'organisation_user' : 'walletless_buyer',
+        },
+      });
       return reply.status(201).send({ success: true, data: tx });
     },
   );
@@ -156,6 +197,17 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
       const { sub: userId } = request.user;
 
       const tx = await updateTransaction(request.params.id, input, userId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: `marketplace.transaction.${input.action}`,
+        resourceType: 'transaction',
+        resourceId: tx.id,
+        status: 'succeeded',
+        metadata: {
+          listingId: tx.listingId,
+          transactionStatus: tx.status,
+        },
+      });
       return reply.send({ success: true, data: tx });
     },
   );

@@ -45,13 +45,13 @@ contract QualityAssurance is AccessControl, Pausable {
     // ── Storage ───────────────────────────────────────────────────────────────
 
     // reportId (bytes32) → Report
-    mapping(bytes32 => Report) public reports;
+    mapping(bytes32 => Report) private reports;
 
     // materialId → array of reportIds (most recent inspections)
-    mapping(bytes32 => bytes32[]) public materialReports;
+    mapping(bytes32 => bytes32[]) private materialReports;
 
     // inspector address → profile
-    mapping(address => InspectorProfile) public inspectors;
+    mapping(address => InspectorProfile) private inspectors;
 
     // ── Events ────────────────────────────────────────────────────────────────
 
@@ -72,9 +72,19 @@ contract QualityAssurance is AccessControl, Pausable {
     event InspectorRegistered(address indexed inspector, string metadataUri);
     event InspectorDeactivated(address indexed inspector);
 
+    // ── Errors ────────────────────────────────────────────────────────────────
+
+    error InvalidAddress();
+    error ReportAlreadyAnchored(bytes32 reportId);
+    error EmptyHash();
+    error EmptyMaterialId();
+    error ReportNotFound(bytes32 reportId);
+    error ReportAlreadyDisputed(bytes32 reportId);
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     constructor(address admin) {
+        if (admin == address(0)) revert InvalidAddress();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
     }
@@ -90,7 +100,7 @@ contract QualityAssurance is AccessControl, Pausable {
         address inspector,
         string calldata metadataUri
     ) external onlyRole(ADMIN_ROLE) {
-        require(inspector != address(0), "QA: zero address");
+        if (inspector == address(0)) revert InvalidAddress();
 
         inspectors[inspector] = InspectorProfile({
             inspector: inspector,
@@ -130,9 +140,9 @@ contract QualityAssurance is AccessControl, Pausable {
         bytes32 reportHash,
         ConditionGrade grade
     ) external onlyRole(INSPECTOR_ROLE) whenNotPaused {
-        require(!reports[reportId].exists, "QA: report already anchored");
-        require(reportHash != bytes32(0), "QA: empty report hash");
-        require(materialId != bytes32(0), "QA: empty material id");
+        if (reports[reportId].exists) revert ReportAlreadyAnchored(reportId);
+        if (reportHash == bytes32(0)) revert EmptyHash();
+        if (materialId == bytes32(0)) revert EmptyMaterialId();
 
         reports[reportId] = Report({
             reportHash: reportHash,
@@ -157,8 +167,8 @@ contract QualityAssurance is AccessControl, Pausable {
      *         Full dispute resolution happens off-chain; this records the flag.
      */
     function flagDispute(bytes32 reportId) external onlyRole(ADMIN_ROLE) whenNotPaused {
-        require(reports[reportId].exists, "QA: report not found");
-        require(!reports[reportId].disputed, "QA: already disputed");
+        if (!reports[reportId].exists) revert ReportNotFound(reportId);
+        if (reports[reportId].disputed) revert ReportAlreadyDisputed(reportId);
 
         reports[reportId].disputed = true;
         inspectors[reports[reportId].inspector].disputedCount += 1;
@@ -189,6 +199,7 @@ contract QualityAssurance is AccessControl, Pausable {
     function getInspectorScore(address inspector) external view returns (uint256) {
         InspectorProfile memory profile = inspectors[inspector];
         if (profile.reportCount == 0) return 100;
+        if (profile.disputedCount >= profile.reportCount) return 0;
         uint256 goodReports = profile.reportCount - profile.disputedCount;
         return (goodReports * 100) / profile.reportCount;
     }

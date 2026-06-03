@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getUser, clearSession, type StoredUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import FeedbackWidget from '@/components/FeedbackWidget';
 
 interface Props {
   children: React.ReactNode;
@@ -31,17 +32,26 @@ export default function DashboardLayout({ children }: Props) {
 
   if (!user) return null;
 
-  const navLinks = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/passports', label: 'Passports' },
-    { href: '/listings', label: 'Listings' },
-    { href: '/transactions', label: 'Orders' },
-    { href: '/quality', label: 'Quality' },
-    { href: '/scan', label: 'Scan QR' },
-  ];
+  const navLinks = user.role === 'buyer'
+    ? [
+        { href: '/marketplace', label: 'Marketplace' },
+        { href: '/transactions', label: 'Orders' },
+        { href: '/access-request', label: 'Seller access' },
+        { href: '/scan', label: 'Scan QR' },
+      ]
+    : [
+        { href: '/dashboard', label: 'Dashboard' },
+        { href: '/passports', label: 'Passports' },
+        { href: '/listings', label: 'Listings' },
+        { href: '/transactions', label: 'Orders' },
+        { href: '/quality', label: 'Quality' },
+        { href: '/scan', label: 'Scan QR' },
+      ];
 
-  if (user.role === 'platform_admin') {
+  if (user.role === 'platform_admin' || user.role === 'hub_admin') {
     navLinks.push({ href: '/admin/access-requests', label: 'Access Requests' });
+    navLinks.push({ href: '/admin/feedback', label: 'Feedback' });
+    navLinks.push({ href: '/admin/activity', label: 'Activity & VTHO' });
   }
 
   return (
@@ -49,7 +59,7 @@ export default function DashboardLayout({ children }: Props) {
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link href={user.role === 'buyer' ? '/marketplace' : '/dashboard'} className="flex items-center gap-2">
               <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
                 <span className="text-white font-bold text-xs">T</span>
               </div>
@@ -80,6 +90,7 @@ export default function DashboardLayout({ children }: Props) {
         </div>
       </header>
       <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+      <FeedbackWidget />
     </div>
   );
 }
