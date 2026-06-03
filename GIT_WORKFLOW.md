@@ -17,7 +17,16 @@ The goal is simple:
 | Production | `trace.adventurous.systems` | `main` | `/opt/TRACE` | `3003` | `3004` |
 | Staging | `trace-staging.adventurous.systems` | `staging` | `/opt/TRACE-staging` | `4003` | `4004` |
 
-Both environments run through nginx and Docker Compose.
+Both environments run through nginx and Docker Compose, on the **same VPS** but as
+fully isolated Compose projects (`trace` vs `trace-staging`) — separate volumes,
+networks, and containers for every service (Postgres, Redis, MinIO, thor-solo,
+Meilisearch). Nothing is shared at the data layer.
+
+Host ports are **not hardcoded per branch**: `docker-compose.yml` is identical on
+both branches and reads ports from each environment's `.env`
+(`API_HOST_PORT`, `WEB_HOST_PORT`, `POSTGRES_HOST_PORT`, … — defaults are the
+production values). This is what lets `main` and `staging` share one compose file
+without diverging. The table above is the effective mapping per environment.
 
 ---
 
@@ -37,8 +46,9 @@ Use three branch types:
 Rules:
 - Never develop directly on `main`
 - Never develop directly on `staging`
+- **`main` only ever fast-forwards from `staging`** — no direct commits, no merge commits into `main`. This is what keeps the two branches from diverging (see Phase 3).
 - Never treat the VPS checkout as the primary working copy
-- Always open Pull Requests through GitHub
+- Always open Pull Requests through GitHub for `feature/* → staging`
 
 ---
 
@@ -88,20 +98,28 @@ Recommended staging QA for auth and access work:
 - approved-user role change, organisation reassignment, and revoke
 - buyer reapply flow after revoke or rejection
 
-### Phase 3: Promote to production
+### Phase 3: Promote to production (fast-forward)
 
-Only after staging is approved:
+Only after staging is approved.
 
-Open a Pull Request:
+**`main` is promoted by fast-forwarding it to `staging`'s exact commit — never by a merge commit.** This keeps `main` and `staging` pointing at the same SHA after every release, so they never show up as "diverged" (the ahead-*and*-behind split that merge-commit promotions cause).
 
-- base: `main`
-- compare: `staging`
-
-After review, merge into `main`.
+```bash
+git checkout main
+git fetch origin
+git merge --ff-only origin/staging   # main jumps to staging's tip — no merge commit
+git push origin main                 # → production auto-deploys
+```
 
 GitHub Actions will deploy `main` to:
 - `/opt/TRACE`
 - `https://trace.adventurous.systems`
+
+After this, `main == staging` (identical SHA). During the next round of development `main` is simply *behind* `staging` — that is the normal promote-from-staging state, not divergence.
+
+`--ff-only` only works if `main` has **no commits of its own**. That is the whole point: never commit to `main` directly, never merge into `main` with a merge commit. Everything reaches `main` by fast-forward from `staging`. (If `--ff-only` is ever rejected, `main` has drifted — reconcile by bringing the stray work onto `staging` first, then fast-forward again.)
+
+> Note on branch protection: a true fast-forward is a direct push, which the GitHub PR "Merge" button cannot do (it always writes a merge or rebase commit). So production promotion is an **admin fast-forward push**, not a PR merge. Keep `main` protected against non-admin/force pushes, but allow the admin fast-forward.
 
 ---
 
@@ -154,31 +172,36 @@ Recommended rules:
 
 ## 7. GitHub Actions Secrets
 
-Configure these repository secrets before enabling automatic deploys:
+These repository secrets are **configured** (2026-06-03) and both pipelines deploy automatically:
 
-- `TRACE_STAGING_SSH_HOST`
-- `TRACE_STAGING_SSH_USER`
-- `TRACE_STAGING_SSH_KEY`
-- `TRACE_PRODUCTION_SSH_HOST`
-- `TRACE_PRODUCTION_SSH_USER`
-- `TRACE_PRODUCTION_SSH_KEY`
+- `TRACE_STAGING_SSH_HOST` / `_USER` / `_KEY`
+- `TRACE_PRODUCTION_SSH_HOST` / `_USER` / `_KEY`
 
-The SSH key should allow deployment access to the relevant server checkout.
+Each environment uses a dedicated CI deploy key (`trace-staging-ci-deploy`,
+`trace-prod-ci-deploy`) whose public key is in the VPS `authorized_keys`; the
+private key lives only in the GitHub secret.
+
+> Deploys occasionally fail with `dial tcp …:22 i/o timeout` — intermittent
+> upstream packet loss between the GitHub runner and the VPS (ruled out
+> MaxStartups/ufw/conntrack/load). A failed run changes nothing on the server
+> (SSH never connects); just re-run the workflow.
 
 ---
 
 ## 8. Emergency Hotfix Flow
 
-If production has a critical issue:
+Hotfixes must still reach production **through `staging`**, so the fast-forward
+relationship (Phase 3) is preserved — never commit a fix straight onto `main`.
 
-1. branch from `main`
-2. create `hotfix/<issue-name>`
-3. fix and test
-4. open PR into `main`
-5. deploy production
-6. immediately merge the same fix back into `staging`
+1. branch from `staging`: `git checkout staging && git pull && git checkout -b hotfix/<issue-name>`
+2. fix and test
+3. PR `hotfix/<issue-name>` → `staging`, merge, verify on staging
+4. fast-forward `main` to `staging` and push (Phase 3) → production deploys
 
-This prevents production and staging from drifting apart.
+If the emergency is so severe you must work from `main` directly, branch from
+`main`, fix, then land the commit on `staging` first (`git checkout staging &&
+git merge --ff-only hotfix/...`) and fast-forward `main` from `staging`. Do **not**
+merge the hotfix into `main` independently — that recreates the divergence.
 
 ---
 
