@@ -8,11 +8,14 @@
     "e2e:ui": "playwright test --ui",
     "e2e:smoke": "playwright test --grep @smoke",
     "e2e:update": "playwright test --update-snapshots",
+    "explore": "tsx explore/explore.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
     "typescript": "^5.5.0"
   }
 }

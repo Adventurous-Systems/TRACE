@@ -17,6 +17,7 @@
     "e2e:ui": "pnpm --filter @trace/e2e e2e:ui",
     "e2e:smoke": "pnpm --filter @trace/e2e e2e:smoke",
     "e2e:update": "pnpm --filter @trace/e2e e2e:update",
+    "e2e:explore": "pnpm --filter @trace/e2e explore",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\" --ignore-path .gitignore",
     "docker:up": "docker compose up -d",
