@@ -77,6 +77,9 @@ function parseArgs(argv: string[]): CliOptions {
       const value = argv[++i];
       if (!value) throw new Error('--password requires a value');
       password = value;
+    } else if (arg === '--') {
+      // pnpm forwards a literal `--` separator before script args; ignore it.
+      continue;
     } else if (arg === '--help' || arg === '-h') {
       console.log('Usage: seed:workshop -- --file <path> [--dry-run] [--password <pw>]');
       process.exit(0);
