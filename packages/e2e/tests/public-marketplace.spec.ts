@@ -20,7 +20,7 @@ test.describe('Public marketplace (logged out)', () => {
     await ctx.dispose();
   });
 
-  test('@smoke marketplace shows the published material', async ({ page }) => {
+  test('marketplace shows the published material', async ({ page }) => {
     await page.goto('/marketplace');
     await expect(page.getByText(productName).first()).toBeVisible();
   });
@@ -37,7 +37,7 @@ test.describe('Public marketplace (logged out)', () => {
     await expect(page).toHaveURL(/\/register/);
   });
 
-  test('@smoke linked passport shows a trust/provenance panel', async ({ page }) => {
+  test('linked passport shows a trust/provenance panel', async ({ page }) => {
     await page.goto(`/passport/${passportId}`);
     await expect(
       page.getByText(/Trust layer prepared|Blockchain verified|Pending verification/).first(),
