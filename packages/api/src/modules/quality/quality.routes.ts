@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { CreateQualityReportSchema } from '@trace/core';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { recordAuditEvent } from '../../lib/audit.js';
 import {
   createQualityReport,
   getReportsByPassport,
@@ -20,6 +21,17 @@ export async function qualityRoutes(app: FastifyInstance): Promise<void> {
       const { sub: inspectorId } = request.user;
 
       const report = await createQualityReport(input, inspectorId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'quality_report.create',
+        resourceType: 'quality_report',
+        resourceId: report.id,
+        status: 'succeeded',
+        metadata: {
+          passportId: report.passportId,
+          overallGrade: report.overallGrade,
+        },
+      });
       return reply.status(201).send({ success: true, data: report });
     },
   );
@@ -62,6 +74,14 @@ export async function qualityRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: [authenticate] },
     async (request, reply) => {
       const report = await disputeReport(request.params.id);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'quality_report.dispute',
+        resourceType: 'quality_report',
+        resourceId: report.id,
+        status: 'succeeded',
+        metadata: { passportId: report.passportId },
+      });
       return reply.send({ success: true, data: report });
     },
   );

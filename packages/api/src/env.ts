@@ -21,6 +21,14 @@ const envSchema = z.object({
 
   // VeChain
   VECHAIN_NODE_URL: z.string().url().default('http://localhost:8669'),
+  DEPLOYER_PRIVATE_KEY: z
+    .string()
+    .optional()
+    .transform(v => v && v !== '0x' ? v : undefined)
+    .pipe(
+      z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'DEPLOYER_PRIVATE_KEY must be a 0x-prefixed 32-byte hex string').optional(),
+    ),
+  WALLET_ENCRYPTION_KEY: z.string().optional().transform(v => v || undefined).pipe(z.string().min(16).optional()),
   MATERIAL_REGISTRY_ADDRESS: z.string().optional(),
   MARKETPLACE_ADDRESS: z.string().optional(),
   CBT_ADDRESS: z.string().optional(),
@@ -29,10 +37,17 @@ const envSchema = z.object({
   GOVERNANCE_ADDRESS: z.string().optional(),
   HUB_REGISTRY_ADDRESS: z.string().optional(),
   CONTRACT_REGISTRY_ADDRESS: z.string().optional(),
-  FEE_DELEGATOR_URL: z.preprocess(
-    (v) => (typeof v === 'string' && v.length > 0 ? v : undefined),
-    z.string().url().optional(),
-  ),
+  FEE_DELEGATOR_URL: z.string().optional().transform(v => v || undefined).pipe(z.string().url().optional()),
+  FEE_DELEGATOR_PRIVATE_KEY: z
+    .string()
+    .optional()
+    .transform(v => v && v !== '0x' ? v : undefined)
+    .pipe(
+      z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'FEE_DELEGATOR_PRIVATE_KEY must be a 0x-prefixed 32-byte hex string').optional(),
+    ),
+  FEE_DELEGATION_REQUIRED: z.string().transform((v) => v === 'true').default('false'),
+  VTHO_WARNING_THRESHOLD_WEI: z.string().default('10000000000000000000'),
+  VTHO_CRITICAL_THRESHOLD_WEI: z.string().default('1000000000000000000'),
 
   // MinIO
   MINIO_ENDPOINT: z.string().default('localhost'),

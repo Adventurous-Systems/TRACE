@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { CreatePassportSchema, UpdatePassportSchema, PassportQuerySchema } from '@trace/core';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { recordAuditEvent } from '../../lib/audit.js';
 import {
   createPassport,
   getPassportById,
@@ -9,6 +10,7 @@ import {
   verifyPassport,
   getPassportHistory,
   uploadPassportPhoto,
+  getPassportCertificate,
 } from './passport.service.js';
 
 export async function passportRoutes(app: FastifyInstance): Promise<void> {
@@ -29,6 +31,14 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const passport = await createPassport(input, userId, organisationId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'passport.create',
+        resourceType: 'passport',
+        resourceId: passport.id,
+        status: 'succeeded',
+        metadata: { productName: passport.productName, status: passport.status },
+      });
       return reply.status(201).send({ success: true, data: passport });
     },
   );
@@ -89,6 +99,14 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
       }
 
       const passport = await updatePassport(request.params.id, input, userId, organisationId);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'passport.update',
+        resourceType: 'passport',
+        resourceId: passport.id,
+        status: 'succeeded',
+        metadata: { productName: passport.productName, status: passport.status },
+      });
       return reply.send({ success: true, data: passport });
     },
   );
@@ -100,6 +118,16 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const passport = await verifyPassport(request.params.id);
       return reply.send({ success: true, data: passport });
+    },
+  );
+
+  // ── GET /api/v1/passports/:id/certificate ────────────────────────────────
+  // Public — certificate-oriented blockchain verification metadata
+  app.get<{ Params: { id: string } }>(
+    '/:id/certificate',
+    async (request, reply) => {
+      const certificate = await getPassportCertificate(request.params.id);
+      return reply.send({ success: true, data: certificate });
     },
   );
 

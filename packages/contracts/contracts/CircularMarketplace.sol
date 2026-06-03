@@ -135,6 +135,7 @@ contract CircularMarketplace is AccessControl, Pausable {
     error NotAuthorised(address caller);
     error InvalidId();
     error InvalidAddress();
+    error DisputeWindowClosed(bytes32 txId);
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
@@ -232,6 +233,7 @@ contract CircularMarketplace is AccessControl, Pausable {
         string calldata offChainId
     ) external onlyRole(HUB_ROLE) whenNotPaused {
         if (txId == bytes32(0)) revert InvalidId();
+        if (_transactions[txId].createdAt != 0) revert InvalidId();
 
         Listing storage listing = _getListing(listingId);
         if (listing.status != ListingStatus.Active) {
@@ -295,6 +297,8 @@ contract CircularMarketplace is AccessControl, Pausable {
     function flagDispute(bytes32 txId) external whenNotPaused {
         MarketTx storage tx_ = _getTx(txId);
 
+        if (block.timestamp > tx_.disputeDeadline) revert DisputeWindowClosed(txId);
+
         if (tx_.buyer != address(0) && tx_.buyer != msg.sender && !hasRole(HUB_ROLE, msg.sender)) {
             revert NotAuthorised(msg.sender);
         }
@@ -309,8 +313,12 @@ contract CircularMarketplace is AccessControl, Pausable {
 
     /**
      * @notice Admin resolves a dispute.
+     * @param completeFavourSeller true → complete the transaction (seller wins);
+     *                             false → cancel and restore listing (buyer wins).
      */
-    function resolveDispute(bytes32 txId) external onlyRole(ADMIN_ROLE) whenNotPaused {
+    function resolveDispute(bytes32 txId, bool completeFavourSeller)
+        external onlyRole(ADMIN_ROLE) whenNotPaused
+    {
         MarketTx storage tx_ = _getTx(txId);
 
         if (tx_.status != TxStatus.Disputed) {
@@ -321,8 +329,15 @@ contract CircularMarketplace is AccessControl, Pausable {
 
         emit DisputeResolved(txId, msg.sender, uint64(block.timestamp));
 
-        // After resolution, complete the transaction
-        _completeTx(txId, tx_);
+        if (completeFavourSeller) {
+            _completeTx(txId, tx_);
+        } else {
+            tx_.status = TxStatus.Cancelled;
+            Listing storage listing = _listings[tx_.listingId];
+            listing.status = ListingStatus.Active;
+            _passportListing[listing.passportId] = tx_.listingId;
+            emit TransactionCancelled(txId, msg.sender, uint64(block.timestamp));
+        }
     }
 
     /**
@@ -344,9 +359,10 @@ contract CircularMarketplace is AccessControl, Pausable {
 
         tx_.status = TxStatus.Cancelled;
 
-        // Reactivate listing
+        // Reactivate listing and restore passport→listing mapping
         Listing storage listing = _listings[tx_.listingId];
         listing.status = ListingStatus.Active;
+        _passportListing[listing.passportId] = tx_.listingId;
 
         emit TransactionCancelled(txId, msg.sender, uint64(block.timestamp));
     }

@@ -8,6 +8,8 @@ export type {
   HazardousSubstance,
   EPCISEvent,
   MaterialPassport,
+  PassportCertificateStatus,
+  PassportCertificate,
 } from './types/passport.js';
 
 export type { UserRole, User, JwtPayload } from './types/user.js';
@@ -23,6 +25,13 @@ export type {
 export type { OrganisationType, OrganisationBranding, Organisation } from './types/hub.js';
 
 export type { QualityGrade, QualityReport } from './types/quality.js';
+
+export type {
+  AuditEventStatus,
+  BlockchainTransactionStatus,
+  AuditEvent,
+  BlockchainTransactionLog,
+} from './types/audit.js';
 
 // Constants
 export {

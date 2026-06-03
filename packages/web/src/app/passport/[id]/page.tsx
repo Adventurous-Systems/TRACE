@@ -1,6 +1,7 @@
-import { passports, type PassportDetail } from '@/lib/api-client';
+import { passports, type PassportCertificate, type PassportDetail } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import CertificatePanel from '@/components/passport/CertificatePanel';
 import Link from 'next/link';
 
 interface Props {
@@ -15,8 +16,19 @@ async function getPassport(id: string): Promise<PassportDetail | null> {
   }
 }
 
+async function getCertificate(id: string): Promise<PassportCertificate | null> {
+  try {
+    return await passports.certificate(id);
+  } catch {
+    return null;
+  }
+}
+
 export default async function PublicPassportPage({ params }: Props) {
-  const passport = await getPassport(params.id);
+  const [passport, certificate] = await Promise.all([
+    getPassport(params.id),
+    getCertificate(params.id),
+  ]);
 
   if (!passport) {
     return (
@@ -59,7 +71,7 @@ export default async function PublicPassportPage({ params }: Props) {
             <span className="font-semibold text-sm">TRACE</span>
           </Link>
           <Badge variant={anchored ? 'success' : 'warning'}>
-            {anchored ? '⛓ Blockchain verified' : 'Pending verification'}
+            {anchored ? 'Blockchain verified' : 'Pending verification'}
           </Badge>
         </div>
       </header>
@@ -100,38 +112,7 @@ export default async function PublicPassportPage({ params }: Props) {
           )}
         </div>
 
-        {/* Blockchain verification strip */}
-        <div
-          className={`rounded-xl border p-4 ${
-            anchored ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
-          }`}
-        >
-          <div className="flex items-start gap-3">
-            <div className={`text-xl ${anchored ? 'text-green-600' : 'text-yellow-600'}`}>
-              {anchored ? '✓' : '⏳'}
-            </div>
-            <div>
-              <p className={`font-medium text-sm ${anchored ? 'text-green-800' : 'text-yellow-800'}`}>
-                {anchored ? 'Data integrity verified on VeChainThor' : 'Blockchain anchoring in progress'}
-              </p>
-              {anchored && passport.blockchainTxHash && (
-                <p className="text-xs text-green-700 font-mono mt-1 break-all">
-                  TX: {passport.blockchainTxHash}
-                </p>
-              )}
-              {anchored && passport.blockchainAnchoredAt && (
-                <p className="text-xs text-green-600 mt-1">
-                  Anchored {new Date(passport.blockchainAnchoredAt).toLocaleDateString()}
-                </p>
-              )}
-              {!anchored && (
-                <p className="text-xs text-yellow-700 mt-1">
-                  This passport will be anchored on VeChainThor within minutes of registration.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <CertificatePanel passportId={passport.id} initialCertificate={certificate} />
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Product info */}

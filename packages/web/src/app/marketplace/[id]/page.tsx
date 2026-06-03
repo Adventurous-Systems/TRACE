@@ -36,7 +36,7 @@ export default function ListingDetailPage() {
     const user = getUser();
 
     if (!token || !user) {
-      router.push('/login');
+      router.push(`/login?next=${encodeURIComponent(`/marketplace/${params.id}`)}`);
       return;
     }
 
@@ -46,7 +46,7 @@ export default function ListingDetailPage() {
       const offerPayload: { listingId: string; notes?: string } = { listingId: params.id };
       if (notes) offerPayload.notes = notes;
       await marketplace.makeOffer(offerPayload, token);
-      setSuccess('Offer placed! The seller will be notified. Check your Orders for updates.');
+      setSuccess('Offer placed. The seller will be notified. Check your Orders for updates.');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to place offer');
     } finally {
@@ -166,9 +166,12 @@ export default function ListingDetailPage() {
                 {listing.status === 'active' ? (
                   <>
                     {success ? (
-                      <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md p-3">
-                        {success}
-                      </p>
+                      <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3 space-y-2">
+                        <p>{success}</p>
+                        <Link href="/transactions" className="font-medium hover:underline">
+                          View orders
+                        </Link>
+                      </div>
                     ) : (
                       <>
                         <textarea
