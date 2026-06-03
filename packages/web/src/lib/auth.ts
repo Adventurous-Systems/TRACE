@@ -21,7 +21,14 @@ export interface SessionState {
 }
 
 export function getPostAuthRedirect(user: StoredUser): string {
-  return user.role === 'buyer' ? '/marketplace' : '/dashboard';
+  if (user.role === 'buyer') return '/marketplace';
+  // Suppliers (workshop sellers) start on their materials — the clearest next step.
+  if (user.role === 'supplier') return '/passports';
+  return '/dashboard';
+}
+
+export function isSupplier(user: StoredUser | null): boolean {
+  return user?.role === 'supplier';
 }
 
 function isJwtExpired(token: string): boolean {

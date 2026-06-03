@@ -303,7 +303,7 @@ export default function RegisterWizard() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="manufacturerName">Manufacturer</Label>
                 <Input
@@ -455,7 +455,7 @@ export default function RegisterWizard() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="deconstructionMethod">Deconstruction method</Label>
                 <select
@@ -482,7 +482,7 @@ export default function RegisterWizard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="previousBuildingId">Previous building ID</Label>
                 <Input
@@ -521,7 +521,7 @@ export default function RegisterWizard() {
             <CardDescription>Carbon and environmental performance metrics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="gwpTotal">GWP total (kgCO₂e)</Label>
                 <Input
@@ -635,7 +635,9 @@ export default function RegisterWizard() {
           <CardHeader>
             <CardTitle>Verification</CardTitle>
             <CardDescription>
-              TRACE is registering the passport fingerprint on VeChainThor.
+              {certificate?.status === 'simulated'
+                ? 'TRACE is preparing the passport’s tamper-evident trust record.'
+                : 'TRACE is registering the passport fingerprint on VeChainThor.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -648,7 +650,7 @@ export default function RegisterWizard() {
                 </div>
                 <div
                   className={`h-10 w-10 rounded-full ${
-                    certificate?.status === 'verified'
+                    certificate?.status === 'verified' || certificate?.status === 'simulated'
                       ? 'bg-green-100'
                       : certificate?.status === 'failed'
                         ? 'bg-red-100'
@@ -660,7 +662,7 @@ export default function RegisterWizard() {
 
             <div
               className={`rounded-md border px-3 py-2 text-sm ${
-                certificate?.status === 'verified'
+                certificate?.status === 'verified' || certificate?.status === 'simulated'
                   ? 'border-green-200 bg-green-50 text-green-700'
                   : certificate?.status === 'failed'
                     ? 'border-red-200 bg-red-50 text-red-700'
@@ -669,9 +671,11 @@ export default function RegisterWizard() {
             >
               {certificate?.status === 'verified'
                 ? 'Blockchain certificate is ready.'
-                : certificate?.status === 'failed'
-                  ? certificate.failureReason ?? 'Verification failed. The passport is saved and can be retried.'
-                  : 'Pending verification. You can keep this page open, or open the passport now.'}
+                : certificate?.status === 'simulated'
+                  ? 'Provenance record prepared — VeChain trust layer simulated for the showcase. You can open the passport now.'
+                  : certificate?.status === 'failed'
+                    ? certificate.failureReason ?? 'Verification failed. The passport is saved and can be retried.'
+                    : 'Pending verification. You can keep this page open, or open the passport now.'}
             </div>
 
             {verificationError && (
@@ -705,7 +709,9 @@ export default function RegisterWizard() {
               onClick={() => createdPassportId && router.push(`/passports/${createdPassportId}`)}
               disabled={!createdPassportId}
             >
-              {certificate?.status === 'verified' ? 'Open verified passport' : 'Open passport anyway'}
+              {certificate?.status === 'verified' || certificate?.status === 'simulated'
+                ? 'Open passport'
+                : 'Open passport anyway'}
             </Button>
           </>
         ) : (

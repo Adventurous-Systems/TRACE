@@ -95,8 +95,8 @@ export default function PassportsPage() {
               <ul className="divide-y">
                 {items.map((p) => (
                   <li key={p.id}>
-                    <div className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors">
-                      <Link href={`/passports/${p.id}`} className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-6 py-4 hover:bg-gray-50 transition-colors">
+                      <Link href={`/passports/${p.id}`} className="min-w-0 basis-full sm:basis-0 sm:flex-1">
                         <p className="font-medium text-sm truncate">{p.productName}</p>
                         <p className="text-xs text-gray-500">
                           {p.categoryL1}
@@ -106,19 +106,32 @@ export default function PassportsPage() {
                           {new Date(p.createdAt).toLocaleDateString()}
                         </p>
                       </Link>
-                      <div className="flex items-center gap-2 ml-4 shrink-0">
-                        {p.blockchainTxHash && (
-                          <span className="text-xs text-green-600" title="Anchored on VeChainThor">⛓</span>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {p.blockchainAnchoredAt && (
+                          <span
+                            className="text-xs text-green-600"
+                            title={p.blockchainTxHash ? 'Anchored on VeChainThor' : 'Trust layer prepared'}
+                          >
+                            {p.blockchainTxHash ? '⛓' : '🛡'}
+                          </span>
                         )}
                         <Badge variant={STATUS_COLORS[p.status] ?? 'outline'}>
                           {p.status}
                         </Badge>
                         {p.status === 'active' && (
-                          <Link href={`/listings/new?passportId=${p.id}`}>
-                            <Button size="sm" variant="outline" className="text-brand-600 border-brand-600 hover:bg-brand-50">
-                              List for sale
-                            </Button>
-                          </Link>
+                          (p.conditionPhotos?.length ?? 0) > 0 ? (
+                            <Link href={`/listings/new?passportId=${p.id}`}>
+                              <Button size="sm" variant="outline" className="text-brand-600 border-brand-600 hover:bg-brand-50">
+                                List for sale
+                              </Button>
+                            </Link>
+                          ) : (
+                            <Link href={`/passports/${p.id}`} title="At least one material photo is required before listing">
+                              <Button size="sm" variant="outline" className="text-amber-600 border-amber-300 hover:bg-amber-50">
+                                Add a photo to list
+                              </Button>
+                            </Link>
+                          )
                         )}
                       </div>
                     </div>

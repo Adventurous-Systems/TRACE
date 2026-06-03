@@ -29,7 +29,11 @@ export default function NewListingPage() {
     const token = getToken();
     if (!token) return;
     const params = new URLSearchParams({ status: 'active', limit: '100' });
-    passports.list(params, token).then((res) => setAvailablePassports(res.data)).catch(console.error);
+    // Only materials with at least one photo can be listed (enforced server-side too).
+    passports
+      .list(params, token)
+      .then((res) => setAvailablePassports(res.data.filter((p) => (p.conditionPhotos?.length ?? 0) > 0)))
+      .catch(console.error);
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -108,7 +112,8 @@ export default function NewListingPage() {
                 </select>
                 {availablePassports.length === 0 && (
                   <p className="text-xs text-gray-400">
-                    No active passports. <a href="/passports/new" className="text-brand-600 hover:underline">Register a material first.</a>
+                    No active materials with a photo yet. At least one material photo is required before listing — add one on the material&apos;s passport page, or{' '}
+                    <a href="/passports/new" className="text-brand-600 hover:underline">register a material first.</a>
                   </p>
                 )}
               </div>
@@ -119,7 +124,7 @@ export default function NewListingPage() {
             <CardContent className="p-5 space-y-4">
               <h2 className="font-semibold text-sm text-gray-700">Pricing</h2>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="price">Price (£) *</Label>
                   <Input
@@ -181,7 +186,7 @@ export default function NewListingPage() {
               </div>
 
               {(shippingMethod === 'delivery' || shippingMethod === 'both') && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="deliveryCost">Delivery cost (£)</Label>
                     <Input

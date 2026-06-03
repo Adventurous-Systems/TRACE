@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { marketplace, type ListingSummary, ApiError } from '@/lib/api-client';
-import { getToken, getUser } from '@/lib/auth';
+import { getToken, getUser, type StoredUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,8 +22,11 @@ export default function ListingDetailPage() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [user, setUser] = useState<StoredUser | null>(null);
 
   useEffect(() => {
+    // Resolve auth state client-side (avoids a hydration mismatch for the CTA).
+    setUser(getUser());
     marketplace
       .getListing(params.id)
       .then(setListing)
@@ -164,39 +167,58 @@ export default function ListingDetailPage() {
                 </div>
 
                 {listing.status === 'active' ? (
-                  <>
-                    {success ? (
-                      <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3 space-y-2">
-                        <p>{success}</p>
-                        <Link href="/transactions" className="font-medium hover:underline">
-                          View orders
-                        </Link>
-                      </div>
-                    ) : (
-                      <>
-                        <textarea
-                          placeholder="Add a note to the seller (optional)"
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          rows={3}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                        />
-                        {error && (
-                          <p className="text-xs text-red-600">{error}</p>
-                        )}
-                        <Button
-                          className="w-full bg-brand-600 hover:bg-brand-700"
-                          onClick={handleMakeOffer}
-                          disabled={offerLoading}
-                        >
-                          {offerLoading ? 'Placing offer…' : 'Make offer at asking price'}
+                  !user ? (
+                    /* Logged-out visitors get a sign-up CTA, never a buy button. */
+                    <div className="space-y-3">
+                      <Link
+                        href={`/register?next=${encodeURIComponent(`/marketplace/${params.id}`)}`}
+                        className="block"
+                      >
+                        <Button className="w-full bg-brand-600 hover:bg-brand-700">
+                          Sign up to buy this material
                         </Button>
-                        <p className="text-xs text-gray-400 text-center">
-                          You will receive confirmation from the hub.
-                        </p>
-                      </>
-                    )}
-                  </>
+                      </Link>
+                      <p className="text-xs text-gray-500 text-center">
+                        Already have an account?{' '}
+                        <Link
+                          href={`/login?next=${encodeURIComponent(`/marketplace/${params.id}`)}`}
+                          className="text-brand-600 hover:underline"
+                        >
+                          Sign in
+                        </Link>
+                      </p>
+                    </div>
+                  ) : success ? (
+                    <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-md p-3 space-y-2">
+                      <p>{success}</p>
+                      <Link href="/transactions" className="font-medium hover:underline">
+                        View orders
+                      </Link>
+                    </div>
+                  ) : (
+                    <>
+                      <textarea
+                        placeholder="Add a note to the seller (optional)"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={3}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+                      />
+                      {error && (
+                        <p className="text-xs text-red-600">{error}</p>
+                      )}
+                      <Button
+                        className="w-full bg-brand-600 hover:bg-brand-700"
+                        onClick={handleMakeOffer}
+                        disabled={offerLoading}
+                      >
+                        {offerLoading ? 'Placing offer…' : 'Make offer at asking price'}
+                      </Button>
+                      <p className="text-xs text-gray-400 text-center">
+                        You will receive confirmation from the seller.
+                      </p>
+                    </>
+                  )
                 ) : (
                   <p className="text-sm text-gray-500 text-center">
                     This listing is {listing.status}.

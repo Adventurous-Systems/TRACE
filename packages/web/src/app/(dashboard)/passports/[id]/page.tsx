@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { passports, quality, type PassportDetail, type QualityReportSummary } from '@/lib/api-client';
-import { getToken, isHubStaff, getUser } from '@/lib/auth';
+import { getToken, isHubStaff, isSupplier, getUser } from '@/lib/auth';
 import CertificatePanel from '@/components/passport/CertificatePanel';
 
 const GRADE_COLORS: Record<string, string> = {
@@ -29,7 +29,7 @@ export default function PassportDetailPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const user = getUser();
-  const canEdit = isHubStaff(user);
+  const canEdit = isHubStaff(user) || isSupplier(user);
 
   useEffect(() => {
     const token = getToken();

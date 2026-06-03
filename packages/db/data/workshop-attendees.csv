@@ -1,0 +1,13 @@
+# TRACE Workshop Showcase — attendee import list (8 June 2026)
+#
+# One attendee per line: email[,name]   (name is optional)
+# Lines starting with '#' and blank lines are ignored.
+# Each attendee is created as a `supplier` in their own single-person organisation.
+#
+# Replace the example rows below with the real attendee list before the event, then run:
+#   pnpm --filter @trace/db seed:workshop -- --file ./data/workshop-attendees.csv --dry-run
+#   pnpm --filter @trace/db seed:workshop -- --file ./data/workshop-attendees.csv
+email,name
+ada.lovelace@example.com,Ada Lovelace
+grace.hopper@example.com,Grace Hopper
+katherine.johnson@example.com

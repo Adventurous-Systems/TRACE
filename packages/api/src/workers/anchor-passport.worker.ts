@@ -13,7 +13,7 @@
 
 import { Worker, type Job } from 'bullmq';
 import { eq } from 'drizzle-orm';
-import { db, materialPassports, type MaterialPassport } from '@trace/db';
+import { db, materialPassports } from '@trace/db';
 import { createLogger } from '@trace/core';
 import { ThorClient } from '@vechain/sdk-network';
 import { ABIFunction } from '@vechain/sdk-core';
@@ -27,6 +27,7 @@ import {
 import { redisConnection, type AnchorPassportJob } from '../lib/queue.js';
 import { submitVeChainTransaction } from '../lib/vechain-transactions.js';
 import { ensureOrganisationWallet } from '../lib/wallet.js';
+import { buildCanonicalJsonLd } from '../lib/passport-hash.js';
 
 const logger = createLogger('anchor-worker');
 
@@ -52,54 +53,6 @@ const HAS_ROLE_FUNCTION = new ABIFunction({
   outputs: [{ name: '', type: 'bool' }],
   stateMutability: 'view',
 });
-
-// ─── Canonical JSON-LD serialiser ──────────────────────────────────────────
-
-function buildCanonicalJsonLd(passport: MaterialPassport): string {
-  const doc = {
-    '@context': [
-      'https://schema.org/',
-      'https://w3id.org/dpp/v1',
-      'https://trace.construction/context/v1',
-    ],
-    '@type': 'MaterialPassport',
-    '@id': `https://trace.construction/passport/${passport.id}`,
-    id: passport.id,
-    organisationId: passport.organisationId,
-    productName: passport.productName,
-    categoryL1: passport.categoryL1,
-    categoryL2: passport.categoryL2 ?? null,
-    gtin: passport.gtin ?? null,
-    serialNumber: passport.serialNumber ?? null,
-    materialComposition: passport.materialComposition,
-    dimensions: passport.dimensions ?? null,
-    technicalSpecs: passport.technicalSpecs,
-    manufacturerName: passport.manufacturerName ?? null,
-    countryOfOrigin: passport.countryOfOrigin ?? null,
-    productionDate: (passport.productionDate as Date | null)?.toISOString() ?? null,
-    gwpTotal: passport.gwpTotal ?? null,
-    embodiedCarbon: passport.embodiedCarbon ?? null,
-    recycledContent: passport.recycledContent ?? null,
-    epdReference: passport.epdReference ?? null,
-    ceMarking: passport.ceMarking,
-    conditionGrade: passport.conditionGrade ?? null,
-    conditionNotes: passport.conditionNotes ?? null,
-    deconstructionDate: (passport.deconstructionDate as Date | null)?.toISOString() ?? null,
-    deconstructionMethod: passport.deconstructionMethod ?? null,
-    reclaimedBy: passport.reclaimedBy ?? null,
-    remainingLifeEstimate: passport.remainingLifeEstimate ?? null,
-    carbonSavingsVsNew: passport.carbonSavingsVsNew ?? null,
-    hazardousSubstances: passport.hazardousSubstances,
-    status: passport.status,
-    createdAt: passport.createdAt.toISOString(),
-  };
-
-  // Sort keys to ensure hash is reproducible regardless of source insertion order
-  const sorted = Object.fromEntries(
-    Object.entries(doc).sort(([a], [b]) => a.localeCompare(b)),
-  );
-  return JSON.stringify(sorted);
-}
 
 // ─── UUID → bytes32 ───────────────────────────────────────────────────────
 

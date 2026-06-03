@@ -37,7 +37,7 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
   // Hub staff/admin: create a listing for a passport
   app.post(
     '/listings',
-    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin', 'supplier')] },
     async (request, reply) => {
       const input = CreateListingSchema.parse(request.body);
       const { sub: userId, organisationId } = request.user;
@@ -70,7 +70,7 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
   // Hub staff: view own hub's listings (all statuses)
   app.get(
     '/listings/hub',
-    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin', 'supplier')] },
     async (request, reply) => {
       const { organisationId } = request.user;
 
@@ -99,7 +99,7 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
   // Hub staff: update price/quantity/shipping, or cancel
   app.patch<{ Params: { id: string } }>(
     '/listings/:id',
-    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin', 'supplier')] },
     async (request, reply) => {
       const { organisationId } = request.user;
 
@@ -143,7 +143,7 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
   // Buyer: make an offer on a listing (creates a transaction)
   app.post(
     '/offers',
-    { preHandler: [authenticate, authorize('buyer', 'hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('buyer', 'supplier', 'hub_staff', 'hub_admin', 'platform_admin')] },
     async (request, reply) => {
       const input = MakeOfferSchema.parse(request.body);
       const { sub: buyerId } = request.user;

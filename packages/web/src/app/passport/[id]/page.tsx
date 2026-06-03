@@ -47,7 +47,14 @@ export default async function PublicPassportPage({ params }: Props) {
     );
   }
 
-  const anchored = !!passport.blockchainTxHash;
+  const trustStatus = certificate?.status ?? (passport.blockchainTxHash ? 'verified' : 'pending');
+  const trust = trustStatus === 'verified'
+    ? { variant: 'success' as const, label: 'Blockchain verified' }
+    : trustStatus === 'simulated'
+      ? { variant: 'success' as const, label: 'Trust layer prepared' }
+      : trustStatus === 'failed'
+        ? { variant: 'destructive' as const, label: 'Verification failed' }
+        : { variant: 'warning' as const, label: 'Pending verification' };
   const conditionLabel =
     passport.conditionGrade === 'A'
       ? 'Excellent'
@@ -70,9 +77,7 @@ export default async function PublicPassportPage({ params }: Props) {
             </div>
             <span className="font-semibold text-sm">TRACE</span>
           </Link>
-          <Badge variant={anchored ? 'success' : 'warning'}>
-            {anchored ? 'Blockchain verified' : 'Pending verification'}
-          </Badge>
+          <Badge variant={trust.variant}>{trust.label}</Badge>
         </div>
       </header>
 

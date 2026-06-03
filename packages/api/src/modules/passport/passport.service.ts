@@ -18,10 +18,32 @@ import { ThorClient } from '@vechain/sdk-network';
 import { ABIFunction } from '@vechain/sdk-core';
 import { anchorQueue } from '../../lib/queue.js';
 import { uploadBuffer } from '../../lib/storage.js';
+import { computePassportHash } from '../../lib/passport-hash.js';
 import { env } from '../../env.js';
 
 // Module-level singleton (avoids reconnecting on every verify call)
 const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
+
+/**
+ * Demo simulation: compute a real keccak256 fingerprint and record it as a
+ * "trust layer prepared" state WITHOUT submitting a VeChain transaction.
+ * The convention `blockchainAnchoredAt != null && blockchainTxHash == null`
+ * marks a simulated record (see getPassportCertificate / verifyPassport).
+ */
+async function simulatePassportAnchor(passport: MaterialPassport): Promise<MaterialPassport> {
+  const hash = computePassportHash(passport);
+  const [updated] = await db
+    .update(materialPassports)
+    .set({
+      blockchainPassportHash: hash,
+      blockchainAnchoredAt: new Date(),
+      blockchainTxHash: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(materialPassports.id, passport.id))
+    .returning();
+  return updated ?? passport;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -32,7 +54,7 @@ export interface PassportWithVerification extends MaterialPassport {
 
 export interface PassportCertificate {
   passportId: string;
-  status: 'pending' | 'verified' | 'failed';
+  status: 'pending' | 'verified' | 'failed' | 'simulated';
   certificateHash: string | null;
   certificateId: string | null;
   txHash: string | null;
@@ -117,12 +139,19 @@ export async function createPassport(
     actorId: userId,
   });
 
+  const activePassport = updated ?? passport;
+
+  // Demo mode: prepare a tamper-evident fingerprint synchronously, no live tx.
+  if (env.DEMO_SIMULATE_ANCHOR) {
+    return await simulatePassportAnchor(activePassport);
+  }
+
   // Enqueue blockchain anchoring job (non-blocking)
   await anchorQueue.add('default', { passportId: passport.id, organisationId }, {
     jobId: `anchor-${passport.id}`,
   });
 
-  return updated ?? passport;
+  return activePassport;
 }
 
 // ─── Read ────────────────────────────────────────────────────────────────────
@@ -241,6 +270,11 @@ export async function updatePassport(
     actorId: userId,
   });
 
+  // Demo mode: re-prepare the fingerprint synchronously instead of re-anchoring.
+  if (env.DEMO_SIMULATE_ANCHOR) {
+    return await simulatePassportAnchor(updated);
+  }
+
   // Re-queue blockchain anchor
   await anchorQueue.add('default', { passportId, organisationId }, {
     jobId: `anchor-${passportId}-${Date.now()}`,
@@ -341,11 +375,19 @@ export async function getPassportCertificate(passportId: string): Promise<Passpo
     passport.blockchainAnchoredAt !== null &&
     verifiedPassport.onchainVerified !== false;
 
+  // Demo simulation: a real fingerprint was prepared but no tx was submitted.
+  const simulated =
+    passport.blockchainTxHash === null &&
+    passport.blockchainAnchoredAt !== null &&
+    passport.blockchainPassportHash !== null;
+
   const status: PassportCertificate['status'] = anchored
     ? 'verified'
-    : latestChainTx?.status === 'failed' || verifiedPassport.onchainVerified === false
-      ? 'failed'
-      : 'pending';
+    : simulated
+      ? 'simulated'
+      : latestChainTx?.status === 'failed' || verifiedPassport.onchainVerified === false
+        ? 'failed'
+        : 'pending';
 
   return {
     passportId,

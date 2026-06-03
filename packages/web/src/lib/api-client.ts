@@ -296,6 +296,7 @@ export interface PassportSummary {
   conditionGrade: string | null;
   status: string;
   qrCodeUrl: string | null;
+  conditionPhotos: string[];
   blockchainTxHash: string | null;
   blockchainAnchoredAt: string | null;
   createdAt: string;
@@ -319,7 +320,6 @@ export interface PassportDetail extends PassportSummary {
   epdReference: string | null;
   ceMarking: boolean;
   conditionNotes: string | null;
-  conditionPhotos: string[];
   previousBuildingId: string | null;
   deconstructionDate: string | null;
   deconstructionMethod: string | null;
@@ -334,7 +334,7 @@ export interface PassportDetail extends PassportSummary {
 
 export interface PassportCertificate {
   passportId: string;
-  status: 'pending' | 'verified' | 'failed';
+  status: 'pending' | 'verified' | 'failed' | 'simulated';
   certificateHash: string | null;
   certificateId: string | null;
   txHash: string | null;

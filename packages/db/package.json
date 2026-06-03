@@ -13,6 +13,7 @@
     "generate": "drizzle-kit generate",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts",
+    "seed:workshop": "tsx scripts/seed-workshop.ts",
     "studio": "drizzle-kit studio"
   },
   "dependencies": {

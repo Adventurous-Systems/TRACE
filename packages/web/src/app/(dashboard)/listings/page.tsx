@@ -77,8 +77,8 @@ export default function ListingsPage() {
             ) : (
               <ul className="divide-y">
                 {items.map((l) => (
-                  <li key={l.id} className="flex items-center justify-between px-6 py-4 gap-4">
-                    <div className="min-w-0 flex-1">
+                  <li key={l.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 sm:px-6 py-4">
+                    <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
                       <p className="font-medium text-sm truncate">{l.passport.productName}</p>
                       <p className="text-xs text-gray-500">
                         {l.passport.categoryL1}
@@ -89,7 +89,7 @@ export default function ListingsPage() {
                         {l.expiresAt ? ` · Expires ${new Date(l.expiresAt).toLocaleDateString()}` : ''}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex flex-wrap items-center gap-3 shrink-0">
                       <span className="font-semibold text-sm">{formatPrice(l.pricePence)}</span>
                       <Badge variant={STATUS_COLORS[l.status] ?? 'outline'}>{l.status}</Badge>
                       <Link href={`/marketplace/${l.id}`}>

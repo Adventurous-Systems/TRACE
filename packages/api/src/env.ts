@@ -46,6 +46,9 @@ const envSchema = z.object({
       z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'FEE_DELEGATOR_PRIVATE_KEY must be a 0x-prefixed 32-byte hex string').optional(),
     ),
   FEE_DELEGATION_REQUIRED: z.string().transform((v) => v === 'true').default('false'),
+  // Demo/showcase: when true, passports get a real keccak256 fingerprint marked
+  // "trust layer prepared" instead of a real on-chain VeChain transaction. Never enable in prod.
+  DEMO_SIMULATE_ANCHOR: z.string().transform((v) => v === 'true').default('false'),
   VTHO_WARNING_THRESHOLD_WEI: z.string().default('10000000000000000000'),
   VTHO_CRITICAL_THRESHOLD_WEI: z.string().default('1000000000000000000'),
 

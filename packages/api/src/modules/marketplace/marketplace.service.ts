@@ -44,6 +44,11 @@ export async function createListing(
   if (passport.status === 'decommissioned') {
     throw new ConflictError('Decommissioned materials cannot be listed');
   }
+  // A material must have at least one photo before it can be listed for sale.
+  const photos = (passport.conditionPhotos ?? []) as string[];
+  if (photos.length === 0) {
+    throw new ConflictError('At least one material photo is required before listing this material.');
+  }
 
   const [listing] = await db
     .insert(listings)

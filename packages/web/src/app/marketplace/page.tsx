@@ -66,15 +66,22 @@ export default function MarketplacePage() {
             <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
               <span className="text-white font-bold text-xs">T</span>
             </div>
-            <span className="font-semibold text-sm">TRACE Marketplace</span>
+            <span className="font-semibold text-sm">
+              TRACE<span className="hidden sm:inline"> Marketplace</span>
+            </span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {user?.role === 'buyer' && (
               <Link href="/access-request">
                 <Button variant="outline" size="sm">Request seller access</Button>
               </Link>
             )}
-            {user && user.role !== 'buyer' && (
+            {user && user.role === 'supplier' && (
+              <Link href="/passports">
+                <Button variant="outline" size="sm">My materials</Button>
+              </Link>
+            )}
+            {user && user.role !== 'buyer' && user.role !== 'supplier' && (
               <Link href="/dashboard">
                 <Button variant="outline" size="sm">Dashboard</Button>
               </Link>

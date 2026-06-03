@@ -18,7 +18,7 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
   // Hub staff / admin creates a new material passport
   app.post(
     '/',
-    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin', 'supplier')] },
     async (request, reply) => {
       const input = CreatePassportSchema.parse(request.body);
       const { sub: userId, organisationId } = request.user;
@@ -86,7 +86,7 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
   // ── PATCH /api/v1/passports/:id ───────────────────────────────────────────
   app.patch<{ Params: { id: string } }>(
     '/:id',
-    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin', 'supplier')] },
     async (request, reply) => {
       const input = UpdatePassportSchema.parse(request.body);
       const { sub: userId, organisationId } = request.user;
@@ -145,7 +145,7 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
   // Upload a condition photo for a passport (multipart/form-data, field: "file")
   app.post<{ Params: { id: string } }>(
     '/:id/photos',
-    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin')] },
+    { preHandler: [authenticate, authorize('hub_staff', 'hub_admin', 'platform_admin', 'supplier')] },
     async (request, reply) => {
       const { organisationId } = request.user;
       if (!organisationId) {

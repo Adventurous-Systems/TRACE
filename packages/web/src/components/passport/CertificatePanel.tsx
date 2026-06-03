@@ -18,6 +18,7 @@ function explorerHref(txHash: string) {
 
 function statusBadge(status: PassportCertificate['status']) {
   if (status === 'verified') return <Badge variant="success">Blockchain verified</Badge>;
+  if (status === 'simulated') return <Badge variant="success">Trust layer prepared</Badge>;
   if (status === 'failed') return <Badge variant="destructive">Verification failed</Badge>;
   return <Badge variant="warning">Pending verification</Badge>;
 }
@@ -52,7 +53,11 @@ export default function CertificatePanel({
     if (!pollPending) return () => { cancelled = true; };
 
     const interval = window.setInterval(() => {
-      if (certificate?.status === 'verified' || certificate?.status === 'failed') {
+      if (
+        certificate?.status === 'verified' ||
+        certificate?.status === 'failed' ||
+        certificate?.status === 'simulated'
+      ) {
         window.clearInterval(interval);
         return;
       }
@@ -116,6 +121,13 @@ export default function CertificatePanel({
             Digital fingerprint registered on VeChainThor by{' '}
             <span className="font-medium text-gray-900">{certificate.hub.name}</span>.
           </p>
+        )}
+
+        {status === 'simulated' && (
+          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+            Tamper-evident fingerprint generated for this passport. VeChain anchoring is
+            simulated for the showcase.
+          </div>
         )}
 
         <dl className="text-sm space-y-2">
