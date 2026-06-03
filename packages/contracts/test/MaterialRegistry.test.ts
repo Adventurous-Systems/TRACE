@@ -1,14 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import type { MaterialRegistry } from '../typechain-types';
 
 // Hardhat's ethers is augmented at runtime but TS doesn't know the full type.
 // Cast to any for getSigners/provider — this is standard hardhat test pattern.
 const hre: any = require('hardhat');
 
 describe('MaterialRegistry', () => {
-  let registry: MaterialRegistry;
+  let registry: any;
   let admin: any;
   let hub: any;
   let other: any;
@@ -26,7 +25,7 @@ describe('MaterialRegistry', () => {
     [admin, hub, other] = await hre.ethers.getSigners();
 
     const MaterialRegistryFactory = await hre.ethers.getContractFactory('MaterialRegistry');
-    registry = (await MaterialRegistryFactory.deploy(admin.address)) as unknown as MaterialRegistry;
+    registry = await MaterialRegistryFactory.deploy(admin.address);
     await registry.waitForDeployment();
 
     await registry.connect(admin).grantHubRole(hub.address);

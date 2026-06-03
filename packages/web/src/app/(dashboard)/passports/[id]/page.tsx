@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { passports, quality, type PassportDetail, type QualityReportSummary } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
+import CertificatePanel from '@/components/passport/CertificatePanel';
 
 const GRADE_COLORS: Record<string, string> = {
   A: 'bg-green-100 text-green-800',
@@ -125,38 +126,7 @@ export default function PassportDetailPage() {
           </Card>
         )}
 
-        {/* Blockchain status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Blockchain anchoring</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {anchored ? (
-              <dl className="text-sm space-y-2">
-                <div className="flex gap-4">
-                  <dt className="text-gray-500 w-32 shrink-0">Status</dt>
-                  <dd className="text-green-600 font-medium">Anchored on VeChainThor</dd>
-                </div>
-                <div className="flex gap-4">
-                  <dt className="text-gray-500 w-32 shrink-0">TX hash</dt>
-                  <dd className="font-mono text-xs break-all">{passport.blockchainTxHash}</dd>
-                </div>
-                <div className="flex gap-4">
-                  <dt className="text-gray-500 w-32 shrink-0">Anchored at</dt>
-                  <dd>{passport.blockchainAnchoredAt ? new Date(passport.blockchainAnchoredAt).toLocaleString() : '—'}</dd>
-                </div>
-                <div className="flex gap-4">
-                  <dt className="text-gray-500 w-32 shrink-0">Data hash</dt>
-                  <dd className="font-mono text-xs break-all">{passport.blockchainPassportHash}</dd>
-                </div>
-              </dl>
-            ) : (
-              <p className="text-sm text-gray-500">
-                Anchoring in progress — this typically completes within a few minutes.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <CertificatePanel passportId={passport.id} />
 
         {/* Passport data */}
         <Card>

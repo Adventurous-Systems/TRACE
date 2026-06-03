@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { auditEvents, db } from '@trace/db';
 import { createTestApp, getAuthHeader, type TestApp } from '../../test-utils.js';
 
 // Uses credentials created by: pnpm db:seed
@@ -42,6 +44,11 @@ describe('POST /api/v1/passports', () => {
     expect(body.data.id).toBeTruthy();
     expect(body.data.productName).toBe(VALID_PASSPORT_PAYLOAD.productName);
     expect(body.data.status).toBe('active');
+
+    const event = await db.query.auditEvents.findFirst({
+      where: eq(auditEvents.resourceId, body.data.id),
+    });
+    expect(event?.action).toBe('passport.create');
   });
 
   it('returns 401 without authentication', async () => {
@@ -101,9 +108,9 @@ describe('GET /api/v1/passports', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: { items: unknown[]; total: number } }>();
+    const body = res.json<{ success: boolean; data: { data: unknown[]; total: number } }>();
     expect(body.success).toBe(true);
-    expect(Array.isArray(body.data.items)).toBe(true);
+    expect(Array.isArray(body.data.data)).toBe(true);
     expect(typeof body.data.total).toBe('number');
   });
 
@@ -256,5 +263,44 @@ describe('GET /api/v1/passports/:id/verify', () => {
     });
 
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('GET /api/v1/passports/:id/certificate', () => {
+  let app: TestApp;
+  let authHeader: { authorization: string };
+  let createdId: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    authHeader = await getAuthHeader(app, SEEDED_ADMIN.email, SEEDED_ADMIN.password);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/passports',
+      headers: authHeader,
+      payload: VALID_PASSPORT_PAYLOAD,
+    });
+    createdId = res.json<{ data: { id: string } }>().data.id;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('returns pending certificate metadata before the anchor worker completes', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/passports/${createdId}/certificate`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{
+      success: boolean;
+      data: { status: string; certificateHash: string | null; hub: { name: string } | null };
+    }>();
+    expect(body.success).toBe(true);
+    expect(['pending', 'verified', 'failed']).toContain(body.data.status);
+    expect(body.data.hub?.name).toBeTruthy();
   });
 });

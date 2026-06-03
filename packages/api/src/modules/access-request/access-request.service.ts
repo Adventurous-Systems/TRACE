@@ -12,6 +12,7 @@ import {
   type UpdateApprovedUserAccessInput,
   type UpdatePendingAccessRequestInput,
 } from '@trace/core';
+import { maybeEnsureOrganisationWallet } from '../../lib/wallet.js';
 
 function slugifyOrganisationName(value: string) {
   return value
@@ -36,6 +37,7 @@ async function resolveOrganisationForApproval(
       throw new NotFoundError('Organisation', input.organisationId);
     }
 
+    await maybeEnsureOrganisationWallet(organisation.id).catch(() => null);
     return organisation;
   }
 
@@ -49,6 +51,7 @@ async function resolveOrganisationForApproval(
   });
 
   if (existingByName) {
+    await maybeEnsureOrganisationWallet(existingByName.id).catch(() => null);
     return existingByName;
   }
 
@@ -80,6 +83,7 @@ async function resolveOrganisationForApproval(
     })
     .returning();
 
+  await maybeEnsureOrganisationWallet(createdOrganisation!.id).catch(() => null);
   return createdOrganisation!;
 }
 
@@ -97,6 +101,25 @@ function sanitizeUser(user: {
     name: user.name,
     role: user.role,
     organisationId: user.organisationId,
+  };
+}
+
+function sanitizeOrganisation(organisation: {
+  id: string;
+  name: string;
+  type: string;
+  slug: string;
+  verified: boolean;
+  blockchainAddress?: string | null;
+} | null) {
+  if (!organisation) return null;
+  return {
+    id: organisation.id,
+    name: organisation.name,
+    type: organisation.type,
+    slug: organisation.slug,
+    verified: organisation.verified,
+    blockchainAddress: organisation.blockchainAddress ?? null,
   };
 }
 
@@ -126,6 +149,7 @@ function serializeAccessRequestWithRelations(request: {
     type: string;
     slug: string;
     verified: boolean;
+    blockchainAddress?: string | null;
   } | null;
   reviewer?: {
     id: string;
@@ -139,6 +163,7 @@ function serializeAccessRequestWithRelations(request: {
     ...request,
     user: sanitizeUser(request.user ?? null),
     reviewer: sanitizeUser(request.reviewer ?? null),
+    targetOrganisation: sanitizeOrganisation(request.targetOrganisation ?? null),
   };
 }
 
@@ -208,6 +233,7 @@ export async function listAccessRequestOrganisations() {
       slug: true,
       type: true,
       verified: true,
+      blockchainAddress: true,
     },
     orderBy: [organisations.name],
   });

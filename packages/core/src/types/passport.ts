@@ -109,3 +109,23 @@ export interface MaterialPassport {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export type PassportCertificateStatus = 'pending' | 'verified' | 'failed';
+
+export interface PassportCertificate {
+  passportId: string;
+  status: PassportCertificateStatus;
+  certificateHash: string | null;
+  certificateId: string | null;
+  txHash: string | null;
+  registeredAt: Date | null;
+  blockNumber: number | null;
+  blockId: string | null;
+  hub: {
+    name: string;
+    address: string | null;
+  } | null;
+  onchainVerified: boolean | null;
+  failureReason: string | null;
+  lastAttemptAt: Date | null;
+}

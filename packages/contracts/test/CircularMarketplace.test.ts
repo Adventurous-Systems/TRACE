@@ -1,12 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import type { CircularMarketplace } from '../typechain-types';
 
 const hre: any = require('hardhat');
 
 describe('CircularMarketplace', () => {
-  let market: CircularMarketplace;
+  let market: any;
   let admin: any;
   let hub: any;
   let buyer: any;
@@ -44,7 +43,7 @@ describe('CircularMarketplace', () => {
     [admin, hub, buyer, other] = await hre.ethers.getSigners();
 
     const Factory = await hre.ethers.getContractFactory('CircularMarketplace');
-    market = (await Factory.deploy(admin.address)) as unknown as CircularMarketplace;
+    market = await Factory.deploy(admin.address);
     await market.waitForDeployment();
 
     await market.connect(admin).grantHubRole(hub.address);

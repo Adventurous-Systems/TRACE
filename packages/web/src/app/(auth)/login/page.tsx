@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,7 +22,10 @@ type LoginForm = z.infer<typeof LoginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
+  const nextPath = searchParams.get('next');
+  const safeNextPath = nextPath?.startsWith('/') && !nextPath.startsWith('//') ? nextPath : null;
 
   const {
     register,
@@ -35,7 +38,7 @@ export default function LoginPage() {
     try {
       const result = await auth.login(data.email, data.password);
       saveSession(result.token, result.user);
-      router.push(getPostAuthRedirect(result.user));
+      router.push(safeNextPath ?? getPostAuthRedirect(result.user));
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Login failed');
     }
@@ -92,7 +95,7 @@ export default function LoginPage() {
               </Button>
               <p className="text-center text-sm text-gray-500">
                 New to TRACE?{' '}
-                <Link href="/register" className="text-brand-600 hover:underline">
+                <Link href={safeNextPath ? `/register?next=${encodeURIComponent(safeNextPath)}` : '/register'} className="text-brand-600 hover:underline">
                   Create an account
                 </Link>
               </p>

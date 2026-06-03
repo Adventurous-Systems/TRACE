@@ -1,5 +1,11 @@
 import { eq, and, ilike, sql, desc } from 'drizzle-orm';
-import { db, materialPassports, passportEvents, type MaterialPassport } from '@trace/db';
+import {
+  blockchainTransactions,
+  db,
+  materialPassports,
+  passportEvents,
+  type MaterialPassport,
+} from '@trace/db';
 import {
   type CreatePassportInput,
   type UpdatePassportInput,
@@ -22,6 +28,24 @@ const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
 export interface PassportWithVerification extends MaterialPassport {
   verified: boolean;
   onchainVerified: boolean | null;
+}
+
+export interface PassportCertificate {
+  passportId: string;
+  status: 'pending' | 'verified' | 'failed';
+  certificateHash: string | null;
+  certificateId: string | null;
+  txHash: string | null;
+  registeredAt: Date | null;
+  blockNumber: number | null;
+  blockId: string | null;
+  hub: {
+    name: string;
+    address: string | null;
+  } | null;
+  onchainVerified: boolean | null;
+  failureReason: string | null;
+  lastAttemptAt: Date | null;
 }
 
 // ─── Create ──────────────────────────────────────────────────────────────────
@@ -284,6 +308,65 @@ export async function verifyPassport(passportId: string): Promise<PassportWithVe
   }
 
   return { ...passport, verified, onchainVerified };
+}
+
+export async function getPassportCertificate(passportId: string): Promise<PassportCertificate> {
+  const passport = await db.query.materialPassports.findFirst({
+    where: eq(materialPassports.id, passportId),
+    with: {
+      organisation: {
+        columns: {
+          name: true,
+          blockchainAddress: true,
+        },
+      },
+    },
+  });
+
+  if (!passport) throw new NotFoundError(`Passport ${passportId} not found`);
+
+  const latestChainTx = await db.query.blockchainTransactions.findFirst({
+    where: and(
+      eq(blockchainTransactions.resourceType, 'passport'),
+      eq(blockchainTransactions.resourceId, passportId),
+    ),
+    orderBy: [desc(blockchainTransactions.createdAt)],
+  });
+
+  const verifiedPassport = await verifyPassport(passportId);
+  const anchored =
+    passport.blockchainTxHash !== null &&
+    passport.blockchainAnchoredAt !== null &&
+    verifiedPassport.onchainVerified !== false;
+
+  const status: PassportCertificate['status'] = anchored
+    ? 'verified'
+    : latestChainTx?.status === 'failed' || verifiedPassport.onchainVerified === false
+      ? 'failed'
+      : 'pending';
+
+  return {
+    passportId,
+    status,
+    certificateHash: passport.blockchainPassportHash,
+    certificateId: passport.blockchainTxHash,
+    txHash: passport.blockchainTxHash,
+    registeredAt: passport.blockchainAnchoredAt,
+    blockNumber: latestChainTx?.blockNumber ?? null,
+    blockId: latestChainTx?.blockId ?? null,
+    hub: passport.organisation
+      ? {
+          name: passport.organisation.name,
+          address: passport.organisation.blockchainAddress,
+        }
+      : null,
+    onchainVerified: verifiedPassport.onchainVerified,
+    failureReason:
+      verifiedPassport.onchainVerified === false
+        ? 'Certificate hash does not match the on-chain record'
+        : latestChainTx?.failureReason ?? null,
+    lastAttemptAt: latestChainTx?.updatedAt ?? latestChainTx?.createdAt ?? null,
+  };
 }
 
 // ─── History ─────────────────────────────────────────────────────────────────

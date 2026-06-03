@@ -9,6 +9,7 @@ import {
   UpdatePendingAccessRequestSchema,
 } from '@trace/core';
 import { authenticate, authorize } from '../../middleware/auth.js';
+import { recordAuditEvent } from '../../lib/audit.js';
 import {
   approveAccessRequest,
   listAccessRequests,
@@ -32,6 +33,17 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
         request.user.role,
         input,
       );
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'access_request.submit',
+        resourceType: 'access_request',
+        resourceId: created.id,
+        status: 'succeeded',
+        metadata: {
+          requestedRole: created.requestedRole,
+          organisationName: created.organisationName,
+        },
+      });
 
       return reply.status(201).send({
         success: true,
@@ -84,6 +96,14 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
       const input = UpdateAccessRequestOrganisationSchema.parse(request.body);
       const params = request.params as { id: string };
       const data = await updateAccessRequestOrganisation(params.id, input);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'organisation.update',
+        resourceType: 'organisation',
+        resourceId: params.id,
+        status: 'succeeded',
+        metadata: { name: data.name, verified: data.verified },
+      });
       return reply.send({
         success: true,
         data,
@@ -98,6 +118,14 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
       const input = UpdatePendingAccessRequestSchema.parse(request.body);
       const params = request.params as { id: string };
       const data = await updatePendingAccessRequest(params.id, input);
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'access_request.update_pending',
+        resourceType: 'access_request',
+        resourceId: params.id,
+        status: 'succeeded',
+        metadata: { requestedRole: input.requestedRole },
+      });
       return reply.send({
         success: true,
         data,
@@ -116,6 +144,18 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
         request.user.sub,
         input,
       );
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'access_request.approve',
+        resourceType: 'access_request',
+        resourceId: params.id,
+        status: 'succeeded',
+        metadata: {
+          approvedRole: input.role,
+          organisationId: input.organisationId ?? data?.targetOrganisationId ?? null,
+          organisationName: input.organisationName ?? data?.targetOrganisation?.name ?? null,
+        },
+      });
 
       return reply.send({
         success: true,
@@ -135,6 +175,14 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
         request.user.sub,
         input,
       );
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'access_request.update_approved_user',
+        resourceType: 'access_request',
+        resourceId: params.id,
+        status: 'succeeded',
+        metadata: { role: input.role },
+      });
 
       return reply.send({
         success: true,
@@ -154,6 +202,13 @@ export async function accessRequestRoutes(app: FastifyInstance): Promise<void> {
         request.user.sub,
         input,
       );
+      await recordAuditEvent({
+        actor: request.user,
+        action: 'access_request.reject',
+        resourceType: 'access_request',
+        resourceId: params.id,
+        status: 'succeeded',
+      });
 
       return reply.send({
         success: true,

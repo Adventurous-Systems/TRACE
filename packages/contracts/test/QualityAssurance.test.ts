@@ -1,12 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
-import type { QualityAssurance } from '../typechain-types';
 
 const hre: any = require('hardhat');
 
 describe('QualityAssurance', () => {
-  let qa: QualityAssurance;
+  let qa: any;
   let admin: any;
   let inspector: any;
   let other: any;
@@ -26,7 +25,7 @@ describe('QualityAssurance', () => {
     [admin, inspector, other] = await hre.ethers.getSigners();
 
     const Factory = await hre.ethers.getContractFactory('QualityAssurance');
-    qa = (await Factory.deploy(admin.address)) as unknown as QualityAssurance;
+    qa = await Factory.deploy(admin.address);
     await qa.waitForDeployment();
 
     // Register inspector so we can use them in report tests
@@ -219,7 +218,7 @@ describe('QualityAssurance', () => {
       // We verify by checking the contract ABI does not expose it.
       const iface = qa.interface;
       const hasReports = iface.fragments.some(
-        (f) => f.type === 'function' && (f as any).name === 'reports',
+        (f: any) => f.type === 'function' && f.name === 'reports',
       );
       expect(hasReports).to.be.false;
     });
@@ -227,7 +226,7 @@ describe('QualityAssurance', () => {
     it('materialReports mapping is not externally accessible (private)', () => {
       const iface = qa.interface;
       const hasMaterialReports = iface.fragments.some(
-        (f) => f.type === 'function' && (f as any).name === 'materialReports',
+        (f: any) => f.type === 'function' && f.name === 'materialReports',
       );
       expect(hasMaterialReports).to.be.false;
     });

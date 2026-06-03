@@ -16,10 +16,17 @@ import { eq } from 'drizzle-orm';
 import { db, materialPassports, type MaterialPassport } from '@trace/db';
 import { createLogger } from '@trace/core';
 import { ThorClient } from '@vechain/sdk-network';
-import { Transaction } from '@vechain/sdk-core';
-import { keccak256, Interface } from 'ethers';
+import { ABIFunction } from '@vechain/sdk-core';
+import { keccak256, Interface, toUtf8Bytes, Wallet } from 'ethers';
 import { env } from '../env.js';
+import {
+  createBlockchainTransaction,
+  recordAuditEvent,
+  updateBlockchainTransaction,
+} from '../lib/audit.js';
 import { redisConnection, type AnchorPassportJob } from '../lib/queue.js';
+import { submitVeChainTransaction } from '../lib/vechain-transactions.js';
+import { ensureOrganisationWallet } from '../lib/wallet.js';
 
 const logger = createLogger('anchor-worker');
 
@@ -31,7 +38,20 @@ const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
 // Minimal ABI for MaterialRegistry
 const REGISTRY_ABI = [
   'function registerPassport(bytes32 passportId, bytes32 dataHash, string calldata metadataUri) external',
+  'function grantHubRole(address hub) external',
 ];
+
+const HUB_ROLE = keccak256(toUtf8Bytes('HUB_ROLE'));
+const HAS_ROLE_FUNCTION = new ABIFunction({
+  type: 'function',
+  name: 'hasRole',
+  inputs: [
+    { name: 'role', type: 'bytes32' },
+    { name: 'account', type: 'address' },
+  ],
+  outputs: [{ name: '', type: 'bool' }],
+  stateMutability: 'view',
+});
 
 // ─── Canonical JSON-LD serialiser ──────────────────────────────────────────
 
@@ -92,6 +112,125 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function waitForReceipt(txId: string) {
+  let receipt = null;
+  for (let i = 0; i < 12; i++) {
+    try {
+      receipt = await thorClient.transactions.getTransactionReceipt(txId);
+      if (receipt) break;
+    } catch {
+      // not yet confirmed
+    }
+    await sleep(5000);
+  }
+  return receipt;
+}
+
+async function ensureHubRole(hubAddress: string, organisationId: string): Promise<void> {
+  if (!env.MATERIAL_REGISTRY_ADDRESS) {
+    throw new Error('MATERIAL_REGISTRY_ADDRESS is not set — cannot grant HUB_ROLE');
+  }
+
+  const hasRoleResult = await thorClient.contracts.executeCall(
+    env.MATERIAL_REGISTRY_ADDRESS,
+    HAS_ROLE_FUNCTION,
+    [HUB_ROLE, hubAddress],
+  );
+  const alreadyHub = hasRoleResult.result?.array?.[0] === true;
+  if (alreadyHub) return;
+
+  if (!env.DEPLOYER_PRIVATE_KEY) {
+    throw new Error('DEPLOYER_PRIVATE_KEY is required to grant HUB_ROLE to org wallets');
+  }
+
+  const deployerAddress = new Wallet(env.DEPLOYER_PRIVATE_KEY).address;
+  const iface = new Interface(REGISTRY_ABI);
+  const callData = iface.encodeFunctionData('grantHubRole', [hubAddress]);
+  const blockchainLog = await createBlockchainTransaction({
+    action: 'org.grantHubRole',
+    resourceType: 'organisation',
+    resourceId: organisationId,
+    organisationId,
+    originAddress: deployerAddress,
+    contractAddress: env.MATERIAL_REGISTRY_ADDRESS,
+    metadata: { hubAddress },
+  });
+
+  try {
+    const submitted = await submitVeChainTransaction({
+      thorClient,
+      originPrivateKey: env.DEPLOYER_PRIVATE_KEY,
+      originAddress: deployerAddress,
+      clauses: [{ to: env.MATERIAL_REGISTRY_ADDRESS, value: '0x0', data: callData }],
+      fallbackGas: 200_000,
+    });
+
+    if (blockchainLog) {
+      await updateBlockchainTransaction(blockchainLog.id, {
+        txHash: submitted.txId,
+        status: 'submitted',
+        gasLimit: submitted.gasLimit,
+        gasPayerAddress: submitted.gasPayerAddress,
+        submittedAt: new Date(),
+        metadata: {
+          hubAddress,
+          gasPayerSource: submitted.gasPayerSource,
+          delegated: submitted.delegated,
+          gasEstimate: submitted.gasEstimate,
+        },
+      });
+    }
+
+    const receipt = await waitForReceipt(submitted.txId);
+    if (!receipt || receipt.reverted) {
+      throw new Error(`HUB_ROLE grant transaction ${submitted.txId} failed or was not confirmed in time`);
+    }
+
+    if (blockchainLog) {
+      await updateBlockchainTransaction(blockchainLog.id, {
+        status: 'succeeded',
+        gasUsed: receipt.gasUsed,
+        gasPayerAddress: receipt.gasPayer ?? submitted.gasPayerAddress,
+        vthoPaidWei: receipt.paid,
+        blockNumber: receipt.meta.blockNumber,
+        blockId: receipt.meta.blockID,
+        confirmedAt: new Date(),
+      });
+    }
+
+    await recordAuditEvent({
+      actor: { organisationId },
+      action: 'org.grantHubRole',
+      resourceType: 'organisation',
+      resourceId: organisationId,
+      status: 'succeeded',
+      metadata: {
+        txHash: submitted.txId,
+        hubAddress,
+        gasUsed: receipt.gasUsed,
+        vthoPaidWei: receipt.paid,
+      },
+    });
+  } catch (err) {
+    if (blockchainLog) {
+      await updateBlockchainTransaction(blockchainLog.id, {
+        status: 'failed',
+        failureReason: err instanceof Error ? err.message : String(err),
+      });
+    }
+    await recordAuditEvent({
+      actor: { organisationId },
+      action: 'org.grantHubRole',
+      resourceType: 'organisation',
+      resourceId: organisationId,
+      status: 'failed',
+      failureReason: err instanceof Error ? err.message : String(err),
+      metadata: { hubAddress },
+    });
+    throw err;
+  }
+}
+
 // ─── Main job processor ───────────────────────────────────────────────────
 
 async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
@@ -116,10 +255,6 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
     throw new Error('MATERIAL_REGISTRY_ADDRESS is not set — cannot anchor passport');
   }
 
-  if (!env.DEPLOYER_PRIVATE_KEY) {
-    throw new Error('DEPLOYER_PRIVATE_KEY is not set — cannot anchor passport');
-  }
-
   // Compute hash
   const jsonLd = buildCanonicalJsonLd(passport);
   const dataHashBytes = keccak256(Buffer.from(jsonLd, 'utf-8'));
@@ -136,55 +271,147 @@ async function processAnchorJob(job: Job<AnchorPassportJob>): Promise<void> {
     metadataUri,
   ]);
 
-  // Sign and submit via VeChain SDK
-  const privKey = Buffer.from(env.DEPLOYER_PRIVATE_KEY.replace(/^0x/, ''), 'hex');
+  let orgWallet: { address: string; privateKey: string } | null = null;
+
+  const blockchainLog = await createBlockchainTransaction({
+    action: 'passport.anchor',
+    resourceType: 'passport',
+    resourceId: passportId,
+    organisationId: passport.organisationId,
+    actorId: passport.registeredBy ?? null,
+    originAddress: null,
+    contractAddress: env.MATERIAL_REGISTRY_ADDRESS,
+    metadata: {
+      certificateHash: dataHashBytes,
+      metadataUri,
+    },
+  });
 
   try {
-    const txBody = await thorClient.transactions.buildTransactionBody(
-      [
-        {
-          to: env.MATERIAL_REGISTRY_ADDRESS,
-          value: '0x0',
-          data: callData,
-        },
-      ],
-      500_000,
+    orgWallet = await ensureOrganisationWallet(passport.organisationId);
+    await ensureHubRole(orgWallet.address, passport.organisationId);
+
+    const submitted = await submitVeChainTransaction({
+      thorClient,
+      originPrivateKey: orgWallet.privateKey,
+      originAddress: orgWallet.address,
+      clauses: [{
+        to: env.MATERIAL_REGISTRY_ADDRESS,
+        value: '0x0',
+        data: callData,
+      }],
+      fallbackGas: 500_000,
+    });
+    logger.info(
+      {
+        passportId,
+        txId: submitted.txId,
+        originAddress: submitted.originAddress,
+        gasPayerAddress: submitted.gasPayerAddress,
+        delegated: submitted.delegated,
+      },
+      'Transaction submitted',
     );
 
-    const signedTx = Transaction.of(txBody).sign(privKey);
-    const rawTx = '0x' + Buffer.from(signedTx.encoded).toString('hex');
-
-    const { id: txId } = await thorClient.transactions.sendRawTransaction(rawTx);
-    logger.info({ passportId, txId }, 'Transaction submitted');
-
-    // Poll for confirmation (up to 60s — VeChain block time ~10s; Solo: near-instant)
-    let receipt = null;
-    for (let i = 0; i < 12; i++) {
-      try {
-        receipt = await thorClient.transactions.getTransactionReceipt(txId);
-        if (receipt) break;
-      } catch {
-        // not yet confirmed
-      }
-      await sleep(5000);
+    if (blockchainLog) {
+      await updateBlockchainTransaction(blockchainLog.id, {
+        txHash: submitted.txId,
+        status: 'submitted',
+        originAddress: submitted.originAddress,
+        gasLimit: submitted.gasLimit,
+        gasPayerAddress: submitted.gasPayerAddress,
+        submittedAt: new Date(),
+        metadata: {
+          certificateHash: dataHashBytes,
+          metadataUri,
+          gasPayerSource: submitted.gasPayerSource,
+          delegated: submitted.delegated,
+          gasEstimate: submitted.gasEstimate,
+        },
+      });
     }
 
+    const receipt = await waitForReceipt(submitted.txId);
+
     if (!receipt || receipt.reverted) {
-      throw new Error(`Transaction ${txId} failed or was not confirmed in time`);
+      throw new Error(`Transaction ${submitted.txId} failed or was not confirmed in time`);
     }
 
     await db
       .update(materialPassports)
       .set({
-        blockchainTxHash: txId,
+        blockchainTxHash: submitted.txId,
         blockchainPassportHash: dataHashBytes,
         blockchainAnchoredAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(materialPassports.id, passportId));
 
-    logger.info({ passportId, txId, dataHashBytes }, 'Passport anchored successfully');
+    if (blockchainLog) {
+      await updateBlockchainTransaction(blockchainLog.id, {
+        status: 'succeeded',
+        gasUsed: receipt.gasUsed,
+        gasPayerAddress: receipt.gasPayer ?? submitted.gasPayerAddress,
+        vthoPaidWei: receipt.paid,
+        blockNumber: receipt.meta.blockNumber,
+        blockId: receipt.meta.blockID,
+        confirmedAt: new Date(),
+      });
+    }
+
+    await recordAuditEvent({
+      actor: {
+        id: passport.registeredBy ?? null,
+        organisationId: passport.organisationId,
+      },
+      action: 'passport.anchor',
+      resourceType: 'passport',
+      resourceId: passportId,
+      status: 'succeeded',
+      metadata: {
+        txHash: submitted.txId,
+        certificateHash: dataHashBytes,
+        originAddress: orgWallet.address,
+        gasPayerAddress: receipt.gasPayer ?? submitted.gasPayerAddress,
+        gasUsed: receipt.gasUsed,
+        vthoPaidWei: receipt.paid,
+        blockNumber: receipt.meta.blockNumber,
+      },
+    });
+
+    logger.info(
+      {
+        passportId,
+        txId: submitted.txId,
+        dataHashBytes,
+        gasUsed: receipt.gasUsed,
+        vthoPaidWei: receipt.paid,
+        gasPayerAddress: receipt.gasPayer ?? submitted.gasPayerAddress,
+      },
+      'Passport anchored successfully',
+    );
   } catch (err) {
+    if (blockchainLog) {
+      await updateBlockchainTransaction(blockchainLog.id, {
+        status: 'failed',
+        failureReason: err instanceof Error ? err.message : String(err),
+      });
+    }
+    await recordAuditEvent({
+      actor: {
+        id: passport.registeredBy ?? null,
+        organisationId: passport.organisationId,
+      },
+      action: 'passport.anchor',
+      resourceType: 'passport',
+      resourceId: passportId,
+      status: 'failed',
+      failureReason: err instanceof Error ? err.message : String(err),
+      metadata: {
+        certificateHash: dataHashBytes,
+        originAddress: orgWallet?.address ?? null,
+      },
+    });
     logger.error({ passportId, err }, 'Failed to anchor passport');
     throw err;
   }
