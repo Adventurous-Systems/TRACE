@@ -1,9 +1,17 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import * as schema from '../drizzle/schema.js';
+
+// Load the repo-root .env for local dev. In containers the env is injected by
+// docker compose and no .env file is present, so dotenv silently no-ops there.
+loadEnv({
+  path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env'),
+});
 
 async function main() {
   const url = process.env['DATABASE_URL'];
