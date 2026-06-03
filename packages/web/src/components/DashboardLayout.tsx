@@ -87,6 +87,7 @@ export default function DashboardLayout({ children }: Props) {
               type="button"
               aria-label="Toggle navigation"
               aria-expanded={mobileNavOpen}
+              data-testid="mobile-nav-toggle"
               onClick={() => setMobileNavOpen((open) => !open)}
               className="md:hidden -ml-1 p-2 rounded-md text-gray-600 hover:bg-gray-100"
             >
@@ -137,7 +138,7 @@ export default function DashboardLayout({ children }: Props) {
 
         {/* Mobile dropdown navigation */}
         {mobileNavOpen && (
-          <nav className="md:hidden border-t bg-white px-2 py-2 space-y-0.5">
+          <nav data-testid="mobile-nav" className="md:hidden border-t bg-white px-2 py-2 space-y-0.5">
             {navLinks.map((l) => (
               <Link
                 key={l.href}
