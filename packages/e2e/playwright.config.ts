@@ -33,15 +33,15 @@ export default defineConfig({
   },
   projects: [
     {
-      // Functional journey specs run on desktop.
+      // Functional journey specs + visual snapshots at desktop width.
       name: 'desktop-chromium',
-      testIgnore: ['**/mobile/**', '**/visual/**'],
+      testIgnore: ['**/mobile/**'],
       use: { ...devices['Desktop Chrome'] },
     },
     {
-      // True 375px mobile viewport (chromium supports isMobile/touch).
+      // 375px mobile: hamburger/overflow checks + visual snapshots.
       name: 'mobile-375',
-      testMatch: '**/mobile/**/*.spec.ts',
+      testMatch: ['**/mobile/**/*.spec.ts', '**/visual/**/*.spec.ts'],
       use: {
         browserName: 'chromium',
         viewport: { width: 375, height: 812 },
@@ -49,12 +49,6 @@ export default defineConfig({
         hasTouch: true,
         deviceScaleFactor: 2,
       },
-    },
-    {
-      // Visual-regression snapshots.
-      name: 'tablet',
-      testMatch: '**/visual/**/*.spec.ts',
-      use: { ...devices['iPad Mini landscape'] },
     },
   ],
 });
