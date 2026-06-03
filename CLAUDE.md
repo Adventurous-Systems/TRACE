@@ -110,7 +110,7 @@ Package naming: `@trace/core`, `@trace/db`, `@trace/api`, `@trace/web`, `@trace/
 ### Smart Contracts (Solidity)
 
 - **Version:** `pragma solidity ^0.8.20;`
-- **Hardhat config:** `evmVersion: 'shanghai'` (VeChainThor compatibility)
+- **Hardhat config:** `evmVersion: 'paris'` (VeChainThor compatibility — VeChainThor does not support the `PUSH0` opcode introduced in `shanghai`)
 - **Plugin:** `@vechain/sdk-hardhat-plugin` for VeChain network connectivity
 - **Testing:** Tests run against Thor Solo node (Docker). Use `npx hardhat test --network vechain_solo`.
 - **Style:** Follow OpenZeppelin patterns. Use `AccessControl` for role management. Events for every state change.
@@ -129,6 +129,20 @@ Package naming: `@trace/core`, `@trace/db`, `@trace/api`, `@trace/web`, `@trace/
 - **JSONB:** Use for flexible/optional attributes (technical_specs, custom_attributes, branding). Structured data gets proper columns.
 
 ---
+
+## VeChain AI Skills (`.claude/skills/`)
+
+Official [VeChain AI skills](https://github.com/vechain/vechain-ai-skills) are vendored into
+`.claude/skills/` and load automatically. Lean on them — they are the **primary source** for
+VeChain topics, ahead of web search:
+
+- **`vechain-core`** — SDK (`@vechain/sdk-core`/`sdk-network`), VIP-191 fee delegation, multi-clause txns. Read before touching [packages/api/src/workers/anchor-passport.worker.ts](packages/api/src/workers/anchor-passport.worker.ts).
+- **`smart-contract-development`** — Solidity/Hardhat, EVM `paris`, UUPS, ABI/TypeChain codegen, security. For [packages/contracts/](packages/contracts/).
+- **`thor`** — Thor node internals + Solo mode (our Docker dev node), built-in contracts, REST API.
+- **`secure-github-actions`** — SHA-pinning + least-privilege workflows for our deploy pipelines.
+- **`frontend`** — React Query / TanStack + transaction UX for [packages/web/](packages/web/).
+
+See [.claude/skills/README.md](.claude/skills/README.md) for provenance and how to re-sync.
 
 ## Blockchain Integration Pattern
 
@@ -328,4 +342,4 @@ Priority order:
 7. Public passport view page (scan QR → see material data)
 8. Basic auth (JWT, hub staff role)
 
-
+Everything else can wait. Get this loop working first.

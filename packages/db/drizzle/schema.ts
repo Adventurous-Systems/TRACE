@@ -25,6 +25,7 @@ export const organisations = pgTable(
     branding: jsonb('branding').$type<Record<string, unknown>>().default({}),
     verified: boolean('verified').default(false).notNull(),
     blockchainAddress: text('blockchain_address'),
+    blockchainPrivateKeyEnc: text('blockchain_private_key_enc'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -193,7 +194,7 @@ export const passportEvents = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     passportId: uuid('passport_id')
       .notNull()
-      .references(() => materialPassports.id),
+      .references(() => materialPassports.id, { onDelete: 'cascade' }),
     eventType: text('event_type').notNull(), // EPCIS 2.0 vocabulary
     eventData: jsonb('event_data').$type<Record<string, unknown>>().notNull(),
     actorId: uuid('actor_id').references(() => users.id),
@@ -206,6 +207,78 @@ export const passportEvents = pgTable(
 export type PassportEvent = typeof passportEvents.$inferSelect;
 export type NewPassportEvent = typeof passportEvents.$inferInsert;
 
+// ── Audit Events ────────────────────────────────────────────────────────────
+
+export const auditEvents = pgTable(
+  'audit_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    actorId: uuid('actor_id').references(() => users.id),
+    actorRole: text('actor_role'),
+    actorEmail: text('actor_email'),
+    organisationId: uuid('organisation_id').references(() => organisations.id),
+    action: text('action').notNull(),
+    resourceType: text('resource_type').notNull(),
+    resourceId: text('resource_id'),
+    status: text('status').notNull(),
+    failureReason: text('failure_reason'),
+    origin: text('origin'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_audit_events_actor').on(table.actorId),
+    index('idx_audit_events_org').on(table.organisationId),
+    index('idx_audit_events_action').on(table.action),
+    index('idx_audit_events_resource').on(table.resourceType, table.resourceId),
+    index('idx_audit_events_created').on(table.createdAt),
+  ],
+);
+
+export type AuditEvent = typeof auditEvents.$inferSelect;
+export type NewAuditEvent = typeof auditEvents.$inferInsert;
+
+// ── Blockchain Transactions ─────────────────────────────────────────────────
+
+export const blockchainTransactions = pgTable(
+  'blockchain_transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    txHash: text('tx_hash'),
+    action: text('action').notNull(),
+    resourceType: text('resource_type').notNull(),
+    resourceId: text('resource_id'),
+    organisationId: uuid('organisation_id').references(() => organisations.id),
+    actorId: uuid('actor_id').references(() => users.id),
+    originAddress: text('origin_address'),
+    gasPayerAddress: text('gas_payer_address'),
+    contractAddress: text('contract_address'),
+    status: text('status').notNull().default('pending'),
+    gasLimit: integer('gas_limit'),
+    gasUsed: integer('gas_used'),
+    vthoPaidWei: text('vtho_paid_wei'),
+    blockNumber: integer('block_number'),
+    blockId: text('block_id'),
+    failureReason: text('failure_reason'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique('blockchain_transactions_tx_hash_unique').on(table.txHash),
+    index('idx_blockchain_transactions_org').on(table.organisationId),
+    index('idx_blockchain_transactions_actor').on(table.actorId),
+    index('idx_blockchain_transactions_resource').on(table.resourceType, table.resourceId),
+    index('idx_blockchain_transactions_status').on(table.status),
+    index('idx_blockchain_transactions_created').on(table.createdAt),
+  ],
+);
+
+export type BlockchainTransaction = typeof blockchainTransactions.$inferSelect;
+export type NewBlockchainTransaction = typeof blockchainTransactions.$inferInsert;
+
 // ── Listings ─────────────────────────────────────────────────────────────────
 
 export const listings = pgTable(
@@ -214,7 +287,7 @@ export const listings = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     passportId: uuid('passport_id')
       .notNull()
-      .references(() => materialPassports.id),
+      .references(() => materialPassports.id, { onDelete: 'cascade' }),
     organisationId: uuid('organisation_id')
       .notNull()
       .references(() => organisations.id),
@@ -258,7 +331,7 @@ export const transactions = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     listingId: uuid('listing_id')
       .notNull()
-      .references(() => listings.id),
+      .references(() => listings.id, { onDelete: 'cascade' }),
     buyerId: uuid('buyer_id')
       .notNull()
       .references(() => users.id),
@@ -291,7 +364,7 @@ export const qualityReports = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     passportId: uuid('passport_id')
       .notNull()
-      .references(() => materialPassports.id),
+      .references(() => materialPassports.id, { onDelete: 'cascade' }),
     inspectorId: uuid('inspector_id')
       .notNull()
       .references(() => users.id),
@@ -322,7 +395,7 @@ export const sensorReadings = pgTable(
   'sensor_readings',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    passportId: uuid('passport_id').references(() => materialPassports.id),
+    passportId: uuid('passport_id').references(() => materialPassports.id, { onDelete: 'cascade' }),
     deviceId: text('device_id').notNull(),
     sensorType: text('sensor_type').notNull(),
     readingValue: jsonb('reading_value').$type<Record<string, unknown>>().notNull(),
@@ -339,12 +412,36 @@ export const sensorReadings = pgTable(
 export type SensorReading = typeof sensorReadings.$inferSelect;
 export type NewSensorReading = typeof sensorReadings.$inferInsert;
 
+// ── Feedback Submissions ─────────────────────────────────────────────────────
+
+export const feedbackSubmissions = pgTable(
+  'feedback_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').references(() => users.id),
+    rating: integer('rating').notNull(), // 1–5
+    category: text('category').notNull(), // bug | ux | feature | general
+    message: text('message').notNull(),
+    pageUrl: text('page_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_feedback_user').on(table.userId),
+    index('idx_feedback_created').on(table.createdAt),
+  ],
+);
+
+export type FeedbackSubmission = typeof feedbackSubmissions.$inferSelect;
+export type NewFeedbackSubmission = typeof feedbackSubmissions.$inferInsert;
+
 // ── Relations ────────────────────────────────────────────────────────────────
 
 export const organisationsRelations = relations(organisations, ({ many }) => ({
   users: many(users),
   materialPassports: many(materialPassports),
   listings: many(listings),
+  auditEvents: many(auditEvents),
+  blockchainTransactions: many(blockchainTransactions),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -356,8 +453,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   reviewedAccessRequests: many(betaAccessRequests, { relationName: 'reviewer' }),
   passportsRegistered: many(materialPassports),
   listings: many(listings),
+  auditEvents: many(auditEvents),
+  blockchainTransactions: many(blockchainTransactions),
   buyerTransactions: many(transactions, { relationName: 'buyer' }),
   sellerTransactions: many(transactions, { relationName: 'seller' }),
+  feedbackSubmissions: many(feedbackSubmissions),
 }));
 
 export const betaAccessRequestsRelations = relations(betaAccessRequests, ({ one }) => ({
@@ -400,6 +500,28 @@ export const passportEventsRelations = relations(passportEvents, ({ one }) => ({
   actor: one(users, {
     fields: [passportEvents.actorId],
     references: [users.id],
+  }),
+}));
+
+export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
+  actor: one(users, {
+    fields: [auditEvents.actorId],
+    references: [users.id],
+  }),
+  organisation: one(organisations, {
+    fields: [auditEvents.organisationId],
+    references: [organisations.id],
+  }),
+}));
+
+export const blockchainTransactionsRelations = relations(blockchainTransactions, ({ one }) => ({
+  actor: one(users, {
+    fields: [blockchainTransactions.actorId],
+    references: [users.id],
+  }),
+  organisation: one(organisations, {
+    fields: [blockchainTransactions.organisationId],
+    references: [organisations.id],
   }),
 }));
 
@@ -451,5 +573,12 @@ export const sensorReadingsRelations = relations(sensorReadings, ({ one }) => ({
   passport: one(materialPassports, {
     fields: [sensorReadings.passportId],
     references: [materialPassports.id],
+  }),
+}));
+
+export const feedbackSubmissionsRelations = relations(feedbackSubmissions, ({ one }) => ({
+  user: one(users, {
+    fields: [feedbackSubmissions.userId],
+    references: [users.id],
   }),
 }));

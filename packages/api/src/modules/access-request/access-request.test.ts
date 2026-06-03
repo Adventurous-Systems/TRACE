@@ -1,23 +1,29 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
-import { db, organisations, users } from '@trace/db';
+import { and, desc, eq } from 'drizzle-orm';
+import { auditEvents, db, organisations, users } from '@trace/db';
 import { createTestApp, getAuthHeader, type TestApp } from '../../test-utils.js';
-
-const SEEDED_BUYER = {
-  email: 'buyer@example.com',
-  password: 'Buyer1234!',
-};
 
 describe('access request flow', () => {
   let app: TestApp;
   let buyerAuth: { authorization: string };
   let platformAdminAuth: { authorization: string };
   let organisationId: string;
+  let buyerId: string;
 
   beforeAll(async () => {
     app = await createTestApp();
-    buyerAuth = await getAuthHeader(app, SEEDED_BUYER.email, SEEDED_BUYER.password);
+    const buyerEmail = `buyer-access-${Date.now()}@example.com`;
+    const buyerPassword = 'Buyer1234!';
+    const [buyer] = await db.insert(users).values({
+      email: buyerEmail,
+      passwordHash: await bcrypt.hash(buyerPassword, 10),
+      name: 'Buyer Access',
+      role: 'buyer',
+      organisationId: null,
+    }).returning();
+    buyerId = buyer!.id;
+    buyerAuth = await getAuthHeader(app, buyerEmail, buyerPassword);
 
     const organisation = await db.query.organisations.findFirst({
       where: eq(organisations.slug, 'stirling'),
@@ -58,6 +64,32 @@ describe('access request flow', () => {
     expect(body.success).toBe(true);
     expect(body.data.status).toBe('pending');
     expect(body.data.requestedRole).toBe('hub_staff');
+  });
+
+  it('logs failed access request attempts', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/access-requests',
+      headers: { ...buyerAuth, origin: 'https://trace.test' },
+      payload: {
+        requestedRole: 'hub_staff',
+        organisationName: 'Stirling Reuse Hub',
+        notes: 'Duplicate pending request',
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+
+    const event = await db.query.auditEvents.findFirst({
+      where: and(
+        eq(auditEvents.action, 'access_request.submit'),
+        eq(auditEvents.actorId, buyerId),
+        eq(auditEvents.status, 'failed'),
+      ),
+      orderBy: [desc(auditEvents.createdAt)],
+    });
+    expect(event?.failureReason).toContain('pending access request');
+    expect(event?.origin).toBe('https://trace.test');
   });
 
   it('lists a buyer request in /mine', async () => {
@@ -112,6 +144,7 @@ describe('access request flow', () => {
     expect(body.data.targetOrganisationId).toBe(organisationId);
     expect(body.data.user.role).toBe('hub_staff');
     expect(body.data.user.organisationId).toBe(organisationId);
+    expect(JSON.stringify(body.data)).not.toContain('blockchainPrivateKeyEnc');
   });
 
   it('allows a platform admin to edit a pending request before review', async () => {

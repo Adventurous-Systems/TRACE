@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile.api
     env_file: .env
     ports:
-      - "3004:3001"
+      - "${API_HOST_PORT:-3004}:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,18 +21,19 @@ services:
       dockerfile: Dockerfile.web
     env_file: .env
     ports:
-      - "3003:3000"
+      - "${WEB_HOST_PORT:-3003}:3000"
     depends_on:
       - api
     restart: unless-stopped
 
   thor-solo:
     image: vechain/thor:latest
-    command: solo --on-demand --persist --api-cors '*' --api-addr 0.0.0.0:8669
+    command: solo --genesis /genesis.json --on-demand --persist --api-cors '*' --api-addr 0.0.0.0:8669
     ports:
-      - "8669:8669"
+      - "${THOR_HOST_PORT:-8669}:8669"
     volumes:
       - thor-data:/home/thor
+      - ./genesis.json:/genesis.json:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8669/blocks/best || exit 1"]
       interval: 10s
@@ -48,7 +49,7 @@ services:
       POSTGRES_USER: trace
       POSTGRES_PASSWORD: trace
     ports:
-      - "15432:5432"
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -62,7 +63,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "16379:6379"
+      - "${REDIS_HOST_PORT:-16379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -76,8 +77,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     ports:
-      - "19000:9000"
-      - "19001:9001"
+      - "${MINIO_HOST_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-19001}:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -94,10 +95,10 @@ services:
   meilisearch:
     image: getmeili/meilisearch:latest
     ports:
-      - "17700:7700"
+      - "${MEILI_HOST_PORT:-17700}:7700"
     environment:
-      MEILI_MASTER_KEY: masterKey
-      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-masterKey}
+      MEILI_ENV: ${MEILI_ENV:-development}
     volumes:
       - meili-data:/meili_data
     healthcheck:

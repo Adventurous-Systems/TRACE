@@ -7,10 +7,13 @@ export {
   betaAccessRequests,
   materialPassports,
   passportEvents,
+  auditEvents,
+  blockchainTransactions,
   listings,
   transactions,
   qualityReports,
   sensorReadings,
+  feedbackSubmissions,
 } from '../drizzle/schema.js';
 
 export type {
@@ -24,6 +27,10 @@ export type {
   NewMaterialPassport,
   PassportEvent,
   NewPassportEvent,
+  AuditEvent,
+  NewAuditEvent,
+  BlockchainTransaction,
+  NewBlockchainTransaction,
   Listing,
   NewListing,
   Transaction,
@@ -32,4 +39,6 @@ export type {
   NewQualityReport,
   SensorReading,
   NewSensorReading,
+  FeedbackSubmission,
+  NewFeedbackSubmission,
 } from '../drizzle/schema.js';

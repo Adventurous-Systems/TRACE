@@ -42,6 +42,7 @@ Thumbs.db
 packages/contracts/cache/
 packages/contracts/artifacts/
 packages/contracts/typechain-types/
+packages/contracts/deployments.json
 
 # Docker volumes (local data)
 .docker/

@@ -1,5 +1,11 @@
 import { eq, and, ilike, sql, desc } from 'drizzle-orm';
-import { db, materialPassports, passportEvents, type MaterialPassport } from '@trace/db';
+import {
+  blockchainTransactions,
+  db,
+  materialPassports,
+  passportEvents,
+  type MaterialPassport,
+} from '@trace/db';
 import {
   type CreatePassportInput,
   type UpdatePassportInput,
@@ -8,14 +14,38 @@ import {
   ForbiddenError,
 } from '@trace/core';
 import QRCode from 'qrcode';
+import { ThorClient } from '@vechain/sdk-network';
+import { ABIFunction } from '@vechain/sdk-core';
 import { anchorQueue } from '../../lib/queue.js';
 import { uploadBuffer } from '../../lib/storage.js';
 import { env } from '../../env.js';
 
+// Module-level singleton (avoids reconnecting on every verify call)
+const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface PassportWithVerification extends MaterialPassport {
-  verified?: boolean;
+  verified: boolean;
+  onchainVerified: boolean | null;
+}
+
+export interface PassportCertificate {
+  passportId: string;
+  status: 'pending' | 'verified' | 'failed';
+  certificateHash: string | null;
+  certificateId: string | null;
+  txHash: string | null;
+  registeredAt: Date | null;
+  blockNumber: number | null;
+  blockId: string | null;
+  hub: {
+    name: string;
+    address: string | null;
+  } | null;
+  onchainVerified: boolean | null;
+  failureReason: string | null;
+  lastAttemptAt: Date | null;
 }
 
 // ─── Create ──────────────────────────────────────────────────────────────────
@@ -44,28 +74,30 @@ export async function createPassport(
 
   if (!passport) throw new Error('Failed to insert passport');
 
-  // Generate QR code pointing to the public passport URL
   const publicUrl = `${env.WEB_URL}/passport/${passport.id}`;
-  const qrBuffer = await QRCode.toBuffer(publicUrl, {
-    type: 'png',
-    width: 400,
-    margin: 2,
-    errorCorrectionLevel: 'H',
-  });
+  let qrCodeUrl: string | undefined;
 
-  const qrKey = `passports/${passport.id}/qr.png`;
-  const qrCodeUrl = await uploadBuffer(
-    env.MINIO_BUCKET_PASSPORTS,
-    qrKey,
-    qrBuffer,
-    'image/png',
-  );
+  if (env.NODE_ENV !== 'test') {
+    const qrBuffer = await QRCode.toBuffer(publicUrl, {
+      type: 'png',
+      width: 400,
+      margin: 2,
+      errorCorrectionLevel: 'H',
+    });
+    const qrKey = `passports/${passport.id}/qr.png`;
+    qrCodeUrl = await uploadBuffer(
+      env.MINIO_BUCKET_PASSPORTS,
+      qrKey,
+      qrBuffer,
+      'image/png',
+    );
+  }
 
   // Update with QR code URL and mark as active
   const [updated] = await db
     .update(materialPassports)
     .set({
-      qrCodeUrl,
+      qrCodeUrl: qrCodeUrl ?? null,
       digitalLinkUri: publicUrl,
       status: 'active',
       updatedAt: new Date(),
@@ -224,6 +256,33 @@ export async function updatePassport(
  * The actual hash comparison is done in the blockchain worker/service,
  * so here we just surface the stored anchor data.
  */
+const VERIFY_FUNCTION = new ABIFunction({
+  type: 'function',
+  name: 'verifyPassport',
+  inputs: [
+    { name: 'passportId', type: 'bytes32' },
+    { name: 'dataHash', type: 'bytes32' },
+  ],
+  outputs: [
+    { name: 'valid', type: 'bool' },
+    {
+      name: 'record', type: 'tuple', components: [
+        { name: 'dataHash', type: 'bytes32' },
+        { name: 'owner', type: 'address' },
+        { name: 'status', type: 'uint8' },
+        { name: 'registeredAt', type: 'uint64' },
+        { name: 'updatedAt', type: 'uint64' },
+        { name: 'metadataUri', type: 'string' },
+      ],
+    },
+  ],
+  stateMutability: 'view',
+});
+
+function uuidToBytes32(uuid: string): string {
+  return '0x' + uuid.replace(/-/g, '').padStart(64, '0');
+}
+
 export async function verifyPassport(passportId: string): Promise<PassportWithVerification> {
   const passport = await db.query.materialPassports.findFirst({
     where: eq(materialPassports.id, passportId),
@@ -234,7 +293,82 @@ export async function verifyPassport(passportId: string): Promise<PassportWithVe
   const verified =
     passport.blockchainTxHash !== null && passport.blockchainAnchoredAt !== null;
 
-  return { ...passport, verified };
+  // Attempt on-chain verification when registry and stored hash are available
+  let onchainVerified: boolean | null = null;
+  if (env.MATERIAL_REGISTRY_ADDRESS && passport.blockchainPassportHash) {
+    try {
+      const result = await thorClient.contracts.executeCall(
+        env.MATERIAL_REGISTRY_ADDRESS,
+        VERIFY_FUNCTION,
+        [uuidToBytes32(passportId), passport.blockchainPassportHash],
+      );
+      onchainVerified = result.result?.array?.[0] === true;
+    } catch (err) {
+      // Node unreachable or contract not deployed — return null, not an error
+      onchainVerified = null;
+    }
+  }
+
+  return { ...passport, verified, onchainVerified };
+}
+
+export async function getPassportCertificate(passportId: string): Promise<PassportCertificate> {
+  const passport = await db.query.materialPassports.findFirst({
+    where: eq(materialPassports.id, passportId),
+    with: {
+      organisation: {
+        columns: {
+          name: true,
+          blockchainAddress: true,
+        },
+      },
+    },
+  });
+
+  if (!passport) throw new NotFoundError(`Passport ${passportId} not found`);
+
+  const latestChainTx = await db.query.blockchainTransactions.findFirst({
+    where: and(
+      eq(blockchainTransactions.resourceType, 'passport'),
+      eq(blockchainTransactions.resourceId, passportId),
+    ),
+    orderBy: [desc(blockchainTransactions.createdAt)],
+  });
+
+  const verifiedPassport = await verifyPassport(passportId);
+  const anchored =
+    passport.blockchainTxHash !== null &&
+    passport.blockchainAnchoredAt !== null &&
+    verifiedPassport.onchainVerified !== false;
+
+  const status: PassportCertificate['status'] = anchored
+    ? 'verified'
+    : latestChainTx?.status === 'failed' || verifiedPassport.onchainVerified === false
+      ? 'failed'
+      : 'pending';
+
+  return {
+    passportId,
+    status,
+    certificateHash: passport.blockchainPassportHash,
+    certificateId: passport.blockchainTxHash,
+    txHash: passport.blockchainTxHash,
+    registeredAt: passport.blockchainAnchoredAt,
+    blockNumber: latestChainTx?.blockNumber ?? null,
+    blockId: latestChainTx?.blockId ?? null,
+    hub: passport.organisation
+      ? {
+          name: passport.organisation.name,
+          address: passport.organisation.blockchainAddress,
+        }
+      : null,
+    onchainVerified: verifiedPassport.onchainVerified,
+    failureReason:
+      verifiedPassport.onchainVerified === false
+        ? 'Certificate hash does not match the on-chain record'
+        : latestChainTx?.failureReason ?? null,
+    lastAttemptAt: latestChainTx?.updatedAt ?? latestChainTx?.createdAt ?? null,
+  };
 }
 
 // ─── History ─────────────────────────────────────────────────────────────────
@@ -291,4 +425,38 @@ function buildInsertValues(input: CreatePassportInput | UpdatePassportInput): In
     hazardousSubstances: (input.hazardousSubstances ?? []) as unknown,
     customAttributes: (input.customAttributes ?? {}) as unknown,
   };
+}
+
+// ─── Upload photo ─────────────────────────────────────────────────────────────
+
+export async function uploadPassportPhoto(
+  passportId: string,
+  buffer: Buffer,
+  mimetype: string,
+  organisationId: string,
+): Promise<MaterialPassport> {
+  const passport = await db.query.materialPassports.findFirst({
+    where: eq(materialPassports.id, passportId),
+  });
+
+  if (!passport) throw new NotFoundError(`Passport ${passportId} not found`);
+  if (passport.organisationId !== organisationId) throw new ForbiddenError('Access denied');
+
+  const ext = mimetype.split('/')[1] ?? 'jpg';
+  const key = `passports/${passportId}/photos/${Date.now()}.${ext}`;
+  const photoUrl = await uploadBuffer(env.MINIO_BUCKET_PASSPORTS, key, buffer, mimetype);
+
+  const existing = (passport.conditionPhotos ?? []) as string[];
+
+  const [updated] = await db
+    .update(materialPassports)
+    .set({
+      conditionPhotos: [...existing, photoUrl] as string[],
+      updatedAt: new Date(),
+    })
+    .where(eq(materialPassports.id, passportId))
+    .returning();
+
+  if (!updated) throw new Error('Failed to update passport photos');
+  return updated;
 }

@@ -141,7 +141,14 @@ export default function AccessRequestPage() {
     }
 
     try {
-      const created = await accessRequests.submit(data, token);
+      const created = await accessRequests.submit(
+        {
+          requestedRole: data.requestedRole,
+          organisationName: data.organisationName,
+          ...(data.notes?.trim() ? { notes: data.notes.trim() } : {}),
+        },
+        token,
+      );
       setPendingRequest({
         status: created.status,
         requestedRole: created.requestedRole,
