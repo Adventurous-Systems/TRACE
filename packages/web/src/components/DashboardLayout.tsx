@@ -155,7 +155,8 @@ export default function DashboardLayout({ children }: Props) {
           </nav>
         )}
       </header>
-      <main className="max-w-7xl mx-auto px-4 py-8">{children}</main>
+      {/* pb-24 keeps the fixed Feedback button from overlapping bottom-aligned actions (e.g. wizard Continue). */}
+      <main className="max-w-7xl mx-auto px-4 pt-8 pb-24">{children}</main>
       <FeedbackWidget />
     </div>
   );

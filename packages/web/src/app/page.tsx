@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ScrollText, ShieldCheck, Recycle, QrCode } from 'lucide-react';
+import { ScrollText, ShieldCheck, Recycle, QrCode, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
@@ -12,7 +12,10 @@ export default function HomePage() {
           </div>
           <span className="font-semibold text-lg">TRACE</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
+          <Link href="/marketplace">
+            <Button variant="ghost" size="sm">Marketplace</Button>
+          </Link>
           <Link href="/login">
             <Button variant="ghost" size="sm">Sign in</Button>
           </Link>
@@ -39,6 +42,11 @@ export default function HomePage() {
           <Link href="/register">
             <Button size="lg" className="bg-brand-600 hover:bg-brand-700">
               Create account
+            </Button>
+          </Link>
+          <Link href="/marketplace">
+            <Button variant="outline" size="lg" className="gap-2">
+              <Store className="h-5 w-5" /> Browse marketplace
             </Button>
           </Link>
           <Link href="/scan">

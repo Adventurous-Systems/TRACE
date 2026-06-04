@@ -1,7 +1,9 @@
 import { passports, type PassportCertificate, type PassportDetail } from '@/lib/api-client';
+import { Leaf, Clock, Recycle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CertificatePanel from '@/components/passport/CertificatePanel';
+import ProvenanceTimeline from '@/components/passport/ProvenanceTimeline';
 import Link from 'next/link';
 
 interface Props {
@@ -103,13 +105,15 @@ export default async function PublicPassportPage({ params }: Props) {
               )}
             </div>
 
-            {passport.qrCodeUrl && (
+            {passport.conditionPhotos?.[0] ? (
               <img
-                src={passport.qrCodeUrl}
-                alt="QR code"
-                className="w-24 h-24 rounded-lg border"
+                src={passport.conditionPhotos[0]}
+                alt={passport.productName}
+                className="w-28 h-28 rounded-lg border object-cover"
               />
-            )}
+            ) : passport.qrCodeUrl ? (
+              <img src={passport.qrCodeUrl} alt="QR code" className="w-24 h-24 rounded-lg border object-contain p-1" />
+            ) : null}
           </div>
 
           {passport.conditionNotes && (
@@ -117,7 +121,44 @@ export default async function PublicPassportPage({ params }: Props) {
           )}
         </div>
 
-        <CertificatePanel passportId={passport.id} initialCertificate={certificate} />
+        {/* Impact stat tiles */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {passport.carbonSavingsVsNew && (
+            <div className="rounded-xl border bg-green-50 p-4">
+              <Leaf className="h-5 w-5 text-green-600" />
+              <p className="mt-2 text-2xl font-bold text-green-700">{passport.carbonSavingsVsNew}</p>
+              <p className="text-xs text-gray-500">kgCO₂e saved vs new</p>
+            </div>
+          )}
+          {passport.conditionGrade && (
+            <div className="rounded-xl border p-4">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-700 font-bold text-sm">
+                {passport.conditionGrade}
+              </span>
+              <p className="mt-2 text-2xl font-bold">{conditionLabel ?? '—'}</p>
+              <p className="text-xs text-gray-500">Condition grade {passport.conditionGrade}</p>
+            </div>
+          )}
+          {passport.remainingLifeEstimate != null && (
+            <div className="rounded-xl border p-4">
+              <Clock className="h-5 w-5 text-gray-500" />
+              <p className="mt-2 text-2xl font-bold">~{passport.remainingLifeEstimate}<span className="text-base font-medium text-gray-500"> yrs</span></p>
+              <p className="text-xs text-gray-500">Estimated remaining life</p>
+            </div>
+          )}
+          {passport.recycledContent && (
+            <div className="rounded-xl border p-4">
+              <Recycle className="h-5 w-5 text-gray-500" />
+              <p className="mt-2 text-2xl font-bold">{passport.recycledContent}%</p>
+              <p className="text-xs text-gray-500">Recycled content</p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <CertificatePanel passportId={passport.id} initialCertificate={certificate} />
+          <ProvenanceTimeline passport={passport} />
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Product info */}
