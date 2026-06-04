@@ -300,8 +300,8 @@ export default function RegisterWizard() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
-      <form onSubmit={handleSubmit(onSubmit)} className="min-w-0">
+    <div className="mx-auto max-w-5xl lg:flex lg:items-start lg:gap-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="min-w-0 lg:flex-1">
       {/* Progress bar */}
       <div className="flex items-center gap-2 mb-8">
         {STEPS.map((s, i) => (
@@ -879,7 +879,7 @@ export default function RegisterWizard() {
         )}
       </div>
       </form>
-      <aside className="hidden lg:block lg:sticky lg:top-20">{preview}</aside>
+      <aside className="hidden lg:block lg:w-[300px] lg:shrink-0 lg:sticky lg:top-20">{preview}</aside>
     </div>
   );
 }
