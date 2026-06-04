@@ -20,6 +20,7 @@ Run sheet for the live demo. The full seller-to-buyer loop is pre-loaded and wor
 | `m.victoria@rgu.ac.uk` | Michele Victoria |
 | `t.dounas@hw.ac.uk` | Theodoros Dounas |
 | `zj20@hw.ac.uk` | ZJ |
+| `m.blazusiak@rgu.ac.uk` | M Blazusiak |
 
 ### System accounts (facilitator use only)
 

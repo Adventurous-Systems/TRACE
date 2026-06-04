@@ -50,6 +50,7 @@ const ADD: Array<{ email: string; name?: string }> = [
   { email: 'm.victoria@rgu.ac.uk' },
   { email: 't.dounas@hw.ac.uk' },
   { email: 'zj20@hw.ac.uk' },
+  { email: 'm.blazusiak@rgu.ac.uk' },
   { email: 'hicomcd@gmail.com', name: 'Hico' },
 ];
 
