@@ -70,7 +70,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Start MinIO + create buckets
+      - name: Start MinIO
+        # Buckets are created on demand by the app (storage.ensureBucket).
         run: |
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
@@ -78,8 +79,6 @@ jobs:
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live && break || sleep 2
           done
-          docker run --rm --network host minio/mc sh -c \
-            "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/passports local/reports"
 
       - name: Migrate + seed the test database
         run: |
