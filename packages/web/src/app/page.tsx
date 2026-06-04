@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-brand-50 to-white">
-      <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
+      <nav className="flex items-center justify-between px-4 sm:px-6 py-4 max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">T</span>
@@ -13,10 +13,10 @@ export default function HomePage() {
           <span className="font-semibold text-lg">TRACE</span>
         </div>
         <div className="flex items-center gap-1 sm:gap-3">
-          <Link href="/marketplace">
+          <Link href="/marketplace" className="hidden sm:block">
             <Button variant="ghost" size="sm">Marketplace</Button>
           </Link>
-          <Link href="/login">
+          <Link href="/login" className="hidden sm:block">
             <Button variant="ghost" size="sm">Sign in</Button>
           </Link>
           <Link href="/register">

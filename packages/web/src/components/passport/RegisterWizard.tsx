@@ -95,6 +95,7 @@ export default function RegisterWizard() {
   const [createdPassportId, setCreatedPassportId] = useState<string | null>(null);
   const [certificate, setCertificate] = useState<PassportCertificate | null>(null);
   const celebratedRef = useRef(false);
+  const [minVerifyDelayPassed, setMinVerifyDelayPassed] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -183,13 +184,26 @@ export default function RegisterWizard() {
     };
   }, [createdPassportId, step]);
 
-  // One-time celebration when the trust record becomes ready.
+  // Hold the "verifying" screen for a beat so it's visibly seen before the result.
   useEffect(() => {
-    if (!celebratedRef.current && (certificate?.status === 'verified' || certificate?.status === 'simulated')) {
+    setMinVerifyDelayPassed(false);
+    if (step !== 'verification') return;
+    const t = setTimeout(() => setMinVerifyDelayPassed(true), 3500);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  const certResolved =
+    certificate?.status === 'verified' || certificate?.status === 'simulated' || certificate?.status === 'failed';
+  const displayStatus: PassportCertificate['status'] =
+    minVerifyDelayPassed && certResolved ? certificate!.status : 'pending';
+
+  // One-time celebration when the trust record visibly becomes ready.
+  useEffect(() => {
+    if (!celebratedRef.current && (displayStatus === 'verified' || displayStatus === 'simulated')) {
       celebratedRef.current = true;
       void celebrate();
     }
-  }, [certificate?.status]);
+  }, [displayStatus]);
 
   const currentIndex = STEPS.findIndex((s) => s.id === step);
 
@@ -780,14 +794,14 @@ export default function RegisterWizard() {
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="flex flex-col items-center text-center py-2">
-              {certificate?.status === 'verified' || certificate?.status === 'simulated' ? (
+              {displayStatus === 'verified' || displayStatus === 'simulated' ? (
                 <div className="relative">
                   <span className="absolute inset-0 rounded-full bg-green-400/40 motion-safe:animate-ring-pulse" />
                   <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700 motion-safe:animate-seal-pop">
                     <ShieldCheck className="h-8 w-8" />
                   </div>
                 </div>
-              ) : certificate?.status === 'failed' ? (
+              ) : displayStatus === 'failed' ? (
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600">
                   <AlertTriangle className="h-8 w-8" />
                 </div>
@@ -800,20 +814,20 @@ export default function RegisterWizard() {
 
             <div
               className={`rounded-md border px-3 py-2 text-sm ${
-                certificate?.status === 'verified' || certificate?.status === 'simulated'
+                displayStatus === 'verified' || displayStatus === 'simulated'
                   ? 'border-green-200 bg-green-50 text-green-700'
-                  : certificate?.status === 'failed'
+                  : displayStatus === 'failed'
                     ? 'border-red-200 bg-red-50 text-red-700'
                     : 'border-yellow-200 bg-yellow-50 text-yellow-800'
               }`}
             >
-              {certificate?.status === 'verified'
+              {displayStatus === 'verified'
                 ? 'Blockchain certificate is ready.'
-                : certificate?.status === 'simulated'
-                  ? 'Provenance record prepared — VeChain trust layer simulated for the showcase. You can open the passport now.'
-                  : certificate?.status === 'failed'
-                    ? certificate.failureReason ?? 'Verification failed. The passport is saved and can be retried.'
-                    : 'Pending verification. You can keep this page open, or open the passport now.'}
+                : displayStatus === 'simulated'
+                  ? 'Provenance record prepared — VeChain trust layer simulated. You can open the passport now.'
+                  : displayStatus === 'failed'
+                    ? certificate?.failureReason ?? 'Verification failed. The passport is saved and can be retried.'
+                    : 'Preparing the tamper-evident trust record…'}
             </div>
 
             {verificationError && (
@@ -847,7 +861,7 @@ export default function RegisterWizard() {
               onClick={() => createdPassportId && router.push(`/passports/${createdPassportId}`)}
               disabled={!createdPassportId}
             >
-              {certificate?.status === 'verified' || certificate?.status === 'simulated'
+              {displayStatus === 'verified' || displayStatus === 'simulated'
                 ? 'Open passport'
                 : 'Open passport anyway'}
             </Button>
