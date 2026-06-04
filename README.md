@@ -64,12 +64,12 @@ packages/sdk/         → TypeScript SDK for external consumers
 | Sprint 0 | Infrastructure, DB schema, API skeleton | ✅ Complete |
 | Sprint 1 | Material passport CRUD · blockchain anchor · QR code · public view | ✅ Complete |
 | Sprint 2 | Marketplace listings · transactions · CircularMarketplace.sol | ✅ Complete |
-| Sprint 3 | Quality reports · inspector workflow · QualityAssurance.sol | 🔨 In Progress |
+| Sprint 3 | Quality reports · inspector workflow · access management · PWA polish | ✅ Complete |
 | Sprint 4 | Governance · CBT token · DAO voting | 🗓 Planned |
 | Sprint 5 | IoT sensor oracle · automated grading | 🗓 Planned |
 | Sprint 6 | Analytics dashboard · environmental metrics | 🗓 Planned |
 
-### What's Working (Sprints 0–2)
+### What's Working (Sprints 0–3)
 
 **Infrastructure**
 - Docker Compose: Thor Solo (VeChain), PostgreSQL, Redis, MinIO, Meilisearch
@@ -107,12 +107,14 @@ packages/sdk/         → TypeScript SDK for external consumers
 - `/listings/new` — Create listing form
 - `/transactions` — Order management
 
-### Sprint 3 Scope (In Progress)
+### Sprint 3 Delivered
 
 - **Quality API:** `POST /api/v1/quality/reports`, `GET /api/v1/quality/reports/:passportId`
-- **QualityAssurance.sol:** Inspector registry, report hash anchoring, dispute flagging
-- **Inspector UI:** Submit quality report form, report history, passport quality tab
-- **Passport detail:** Quality reports section with grade badges
+- **Access management:** Public signup → access request → platform admin review/approve/revoke
+- **Feedback widget:** Floating button on all dashboard pages; platform admin review at `/admin/feedback`
+- **Blockchain simulation:** `DEMO_SIMULATE_ANCHOR=true` — tamper-evident fingerprint (keccak256) + `GET /passports/:id/verify-integrity` recompute-and-compare
+- **PWA:** Real logo, manifest, service worker, mobile-first
+- **E2E suite:** Playwright functional, visual-regression, smoke, and a11y crawls
 
 ---
 
@@ -134,15 +136,18 @@ pnpm --filter @trace/api dev   # http://localhost:3001
 pnpm --filter @trace/web dev   # http://localhost:3000
 ```
 
-**Test credentials:**
+**Test credentials (local dev seed):**
 
 | Role | Email | Password |
 |------|-------|----------|
 | Platform Admin | platform@trace.eco | Platform1234! |
-| Hub Staff | staff@stirlingreuse.com | Staff1234! |
 | Hub Admin | admin@stirlingreuse.com | Admin1234! |
+| Hub Staff | staff@stirlingreuse.com | Staff1234! |
 | Inspector | inspector@trace.eco | Inspector1234! |
 | Buyer | buyer@example.com | Buyer1234! |
+| Supplier | ada.lovelace@example.com | Password1234! |
+
+**Production (workshop) accounts use password `TRACE_SRH!`.** See [`docs/trace_launch_demo.md`](./docs/trace_launch_demo.md).
 
 **Public auth notes:**
 

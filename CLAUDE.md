@@ -328,18 +328,18 @@ pnpm e2e                                     # Playwright E2E (requires all serv
 
 ## Current Sprint Focus
 
-**Sprint 0 → S1: Foundation + Vertical Slice 1**
+**Sprints 0–3 complete. Platform is workshop-ready (8 June 2026 demo).**
 
-Goal: Register a material → anchor on VeChain → generate QR → scan QR → view passport.
+Completed vertical slices:
+1. Register material → blockchain fingerprint → QR → public passport view
+2. Marketplace listings → buyer offer → transaction lifecycle
+3. Quality reports (inspector workflow) · access management (platform admin) · feedback widget
+4. PWA: real logo, manifest, service worker, mobile-first responsive
+5. Blockchain simulation: `DEMO_SIMULATE_ANCHOR=true` + `verify-integrity` recompute-and-compare
 
-Priority order:
-1. Docker Compose with Thor Solo + PostgreSQL + Redis
-2. Database schema + migrations (core tables only)
-3. `MaterialRegistry.sol` deployed to Thor Solo
-4. API: POST /api/v1/passports (create + blockchain anchor)
-5. API: GET /api/v1/passports/:id (read with verification)
-6. QR code generation on passport creation
-7. Public passport view page (scan QR → see material data)
-8. Basic auth (JWT, hub staff role)
+**Next: Sprint 4 — Governance & CBT token**
+- Smart contract: `Governance.sol` (DAO voting), `CBT.sol` (Circular Behaviour Token)
+- API: governance proposals, voting, CBT reward distribution
+- Frontend: governance dashboard, voting UI
 
-Everything else can wait. Get this loop working first.
+See [`docs/trace_launch_demo.md`](./docs/trace_launch_demo.md) for the live demo run sheet.
