@@ -130,7 +130,7 @@ export default function CertificatePanel({
             <p className="text-xs text-gray-500 max-w-xs">
               {status === 'verified'
                 ? <>Digital fingerprint registered on VeChainThor{certificate?.hub ? <> by <span className="font-medium text-gray-700">{certificate.hub.name}</span></> : null}.</>
-                : 'Tamper-evident fingerprint generated · VeChain anchoring simulated for the showcase.'}
+                : 'Tamper-evident fingerprint generated · VeChain anchoring simulated.'}
             </p>
           </div>
         ) : status === 'pending' ? (
