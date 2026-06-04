@@ -11,12 +11,29 @@ const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
  */
 async function mintState(account: Account): Promise<void> {
   const ctx = await request.newContext({ baseURL: API_URL });
-  const res = await ctx.post('/api/v1/auth/login', {
-    data: { email: account.email, password: account.password },
-  });
-  if (!res.ok()) {
+
+  // Retry: the API may be mid-restart right after a deploy (smoke runs eagerly).
+  let lastError = '';
+  let res = null;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const r = await ctx.post('/api/v1/auth/login', {
+        data: { email: account.email, password: account.password },
+        timeout: 15_000,
+      });
+      if (r.ok()) {
+        res = r;
+        break;
+      }
+      lastError = `HTTP ${r.status()}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  }
+  if (!res) {
     throw new Error(
-      `[e2e global-setup] login failed for ${account.email} (HTTP ${res.status()}). ` +
+      `[e2e global-setup] login failed for ${account.email} after retries (${lastError}). ` +
         'Ensure the API is up and `seed` + `seed:workshop` have run against the target DB.',
     );
   }

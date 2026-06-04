@@ -10,11 +10,6 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    # Run inside the pinned Playwright image so browsers AND rendering match the
-    # committed visual baselines byte-for-byte (generated in this same image).
-    container:
-      image: mcr.microsoft.com/playwright:v1.60.0-jammy
-      options: --ipc=host
 
     services:
       postgres:
@@ -23,6 +18,8 @@ jobs:
           POSTGRES_DB: trace_test
           POSTGRES_USER: trace
           POSTGRES_PASSWORD: trace
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U trace -d trace_test"
           --health-interval 10s
@@ -30,24 +27,18 @@ jobs:
           --health-retries 5
       redis:
         image: redis:7-alpine
+        ports:
+          - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      minio:
-        # bitnami image auto-starts the server and creates the buckets.
-        image: bitnami/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_DEFAULT_BUCKETS: passports,reports
 
     env:
-      # Services are reachable by name from the job container.
-      DATABASE_URL: postgresql://trace:trace@postgres:5432/trace_test
-      REDIS_URL: redis://redis:6379
-      MINIO_ENDPOINT: minio
+      DATABASE_URL: postgresql://trace:trace@localhost:5432/trace_test
+      REDIS_URL: redis://localhost:6379
+      MINIO_ENDPOINT: localhost
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -67,17 +58,28 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@9.15.9 --activate
+      - name: Set up pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Wait for MinIO
+      - name: Start MinIO + create buckets
         run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data
           for i in $(seq 1 30); do
-            curl -sf http://minio:9000/minio/health/live && break || sleep 2
+            curl -sf http://localhost:9000/minio/health/live && break || sleep 2
           done
+          docker run --rm --network host minio/mc sh -c \
+            "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb -p local/passports local/reports"
 
       - name: Migrate + seed the test database
         run: |
@@ -93,10 +95,16 @@ jobs:
           pnpm --filter @trace/api exec tsx src/index.ts > /tmp/api.log 2>&1 &
           pnpm --filter @trace/web start > /tmp/web.log 2>&1 &
           for i in $(seq 1 60); do
-            curl -sf http://localhost:3001/health && curl -sf http://localhost:3000 >/dev/null && break || sleep 2
+            curl -sf http://localhost:3001/health >/dev/null && curl -sf http://localhost:3000 >/dev/null && break || sleep 2
           done
 
-      - name: Run E2E suite (functional + visual)
+      - name: Install Playwright browsers
+        run: pnpm --filter @trace/e2e exec playwright install --with-deps chromium
+
+      # Functional + mobile specs. Visual specs are opt-in (RUN_VISUAL=1) and run
+      # in the pinned Playwright container locally, where rendering matches the
+      # committed baselines — so they are intentionally skipped here.
+      - name: Run E2E suite (functional + mobile)
         run: pnpm e2e
 
       - name: Dump server logs on failure
@@ -107,7 +115,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
           path: |

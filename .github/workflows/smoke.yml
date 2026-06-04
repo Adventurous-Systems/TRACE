@@ -43,12 +43,26 @@ jobs:
       - name: Install Playwright chromium
         run: pnpm --filter @trace/e2e exec playwright install --with-deps chromium
 
+      # The deploy that triggers this run restarts the API container; wait until
+      # both web and API are actually serving before probing (avoids a false fail).
+      - name: Wait for production to be serving
+        run: |
+          for i in $(seq 1 30); do
+            web=$(curl -s -o /dev/null -w '%{http_code}' "$E2E_BASE_URL/")
+            api=$(curl -s -o /dev/null -w '%{http_code}' "$E2E_API_URL/api/v1/marketplace/listings")
+            echo "attempt $i: web=$web api=$api"
+            [ "$web" = "200" ] && [ "$api" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "production did not become ready in time" >&2
+          exit 1
+
       - name: Run smoke checks against production
         run: pnpm e2e:smoke
 
       - name: Upload report on failure
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: smoke-report
           path: |
