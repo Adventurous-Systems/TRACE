@@ -16,7 +16,7 @@ export default function HomePage() {
           <Link href="/marketplace" className="hidden sm:block">
             <Button variant="ghost" size="sm">Marketplace</Button>
           </Link>
-          <Link href="/login" className="hidden sm:block">
+          <Link href="/login">
             <Button variant="ghost" size="sm">Sign in</Button>
           </Link>
           <Link href="/register">
