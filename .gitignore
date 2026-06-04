@@ -50,3 +50,4 @@ packages/contracts/deployments.json
 # Test results
 test-results/
 playwright-report/
+assets/incoming/

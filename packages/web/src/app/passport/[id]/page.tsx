@@ -2,6 +2,7 @@ import { passports, type PassportCertificate, type PassportDetail } from '@/lib/
 import { Leaf, Clock, Recycle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Logo } from '@/components/ui/Logo';
 import CertificatePanel from '@/components/passport/CertificatePanel';
 import ProvenanceTimeline from '@/components/passport/ProvenanceTimeline';
 import Link from 'next/link';
@@ -73,11 +74,8 @@ export default async function PublicPassportPage({ params }: Props) {
       {/* Header */}
       <header className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-xs">T</span>
-            </div>
-            <span className="font-semibold text-sm">TRACE</span>
+          <Link href="/" className="flex items-center" aria-label="TRACE home">
+            <Logo className="h-7" />
           </Link>
           <Badge variant={trust.variant}>{trust.label}</Badge>
         </div>

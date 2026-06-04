@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getUser, clearSession, type StoredUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/ui/Logo';
 import FeedbackWidget from '@/components/FeedbackWidget';
 
 interface Props {
@@ -106,11 +107,8 @@ export default function DashboardLayout({ children }: Props) {
                 )}
               </svg>
             </button>
-            <Link href={homeHref} className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-xs">T</span>
-              </div>
-              <span className="font-semibold text-sm hidden sm:block">TRACE</span>
+            <Link href={homeHref} className="flex items-center" aria-label="TRACE home">
+              <Logo className="h-7" />
             </Link>
             <nav className="hidden md:flex items-center gap-1">
               {navLinks.map((l) => (

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CountUp } from '@/components/ui/count-up';
+import { Logo } from '@/components/ui/Logo';
 import { Recycle, Leaf } from 'lucide-react';
 
 const CONDITION_COLORS: Record<string, 'default' | 'success' | 'warning' | 'outline'> = {
@@ -67,13 +68,9 @@ export default function MarketplacePage() {
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-14">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-xs">T</span>
-            </div>
-            <span className="font-semibold text-sm">
-              TRACE<span className="hidden sm:inline"> Marketplace</span>
-            </span>
+          <Link href="/" className="flex items-center gap-2" aria-label="TRACE Marketplace home">
+            <Logo className="h-7" />
+            <span className="font-semibold text-sm text-gray-500 hidden sm:inline">Marketplace</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             {user?.role === 'buyer' && (

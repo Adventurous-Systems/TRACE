@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Logo } from '@/components/ui/Logo';
 
 function formatPrice(pence: number) {
   return `£${(pence / 100).toFixed(2)}`;
@@ -82,10 +83,8 @@ export default function ListingDetailPage() {
           <Link href="/marketplace" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
             ← Marketplace
           </Link>
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-xs">T</span>
-            </div>
+          <Link href="/" className="flex items-center" aria-label="TRACE home">
+            <Logo className="h-6" />
           </Link>
         </div>
       </header>

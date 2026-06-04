@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Logo } from '@/components/ui/Logo';
 
 const AccessRequestSchema = z.object({
   requestedRole: z.enum(['hub_staff', 'hub_admin']),
@@ -186,11 +187,8 @@ export default function AccessRequestPage() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 flex items-center justify-between h-14">
-          <Link href="/marketplace" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-brand-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-xs">T</span>
-            </div>
-            <span className="font-semibold text-sm">TRACE</span>
+          <Link href="/marketplace" className="flex items-center" aria-label="TRACE home">
+            <Logo className="h-7" />
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500 hidden sm:block">{user.email}</span>

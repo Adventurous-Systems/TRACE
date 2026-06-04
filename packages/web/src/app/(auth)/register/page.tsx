@@ -59,10 +59,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">T</span>
-          </div>
-          <h1 className="text-2xl font-bold">TRACE</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/trace-logo.png" alt="TRACE" className="mx-auto h-24 w-24" />
         </div>
         <Card>
           <CardHeader>
