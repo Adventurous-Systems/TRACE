@@ -100,6 +100,7 @@ export interface ListingWithPassport extends Listing {
     conditionNotes: string | null;
     carbonSavingsVsNew: string | null;
     qrCodeUrl: string | null;
+    photo?: string | null;
   };
   organisation: {
     name: string;
@@ -190,6 +191,7 @@ export async function searchListings(
       passportConditionNotes: materialPassports.conditionNotes,
       passportCarbonSavingsVsNew: materialPassports.carbonSavingsVsNew,
       passportQrCodeUrl: materialPassports.qrCodeUrl,
+      passportPhotos: materialPassports.conditionPhotos,
       // Organisation fields
       orgName: organisations.name,
       orgSlug: organisations.slug,
@@ -233,6 +235,7 @@ export async function searchListings(
       conditionNotes: row.passportConditionNotes,
       carbonSavingsVsNew: row.passportCarbonSavingsVsNew,
       qrCodeUrl: row.passportQrCodeUrl,
+      photo: (row.passportPhotos as string[] | null)?.[0] ?? null,
     },
     organisation: {
       name: row.orgName,
@@ -246,6 +249,18 @@ export async function searchListings(
     page: query.page,
     limit: query.limit,
   };
+}
+
+export async function getMarketplaceStats(): Promise<{ totalCarbonSavedKg: number; activeCount: number }> {
+  const [row] = await db
+    .select({
+      total: sql<number>`coalesce(sum(cast(${materialPassports.carbonSavingsVsNew} as double precision)), 0)`,
+      count: sql<number>`cast(count(*) as int)`,
+    })
+    .from(listings)
+    .innerJoin(materialPassports, eq(listings.passportId, materialPassports.id))
+    .where(eq(listings.status, 'active'));
+  return { totalCarbonSavedKg: Math.round(Number(row?.total ?? 0)), activeCount: row?.count ?? 0 };
 }
 
 export async function listHubListings(

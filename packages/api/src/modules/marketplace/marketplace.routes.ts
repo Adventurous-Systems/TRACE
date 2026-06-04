@@ -12,6 +12,7 @@ import {
   createListing,
   getListingById,
   searchListings,
+  getMarketplaceStats,
   listHubListings,
   updateListing,
   cancelListing,
@@ -32,6 +33,13 @@ export async function marketplaceRoutes(app: FastifyInstance): Promise<void> {
       return reply.send({ success: true, data: result });
     },
   );
+
+  // ── GET /api/v1/marketplace/stats ─────────────────────────────────────────
+  // Public: aggregate impact (carbon saved + active listing count)
+  app.get('/stats', async (_request, reply) => {
+    const stats = await getMarketplaceStats();
+    return reply.send({ success: true, data: stats });
+  });
 
   // ── POST /api/v1/marketplace/listings ─────────────────────────────────────
   // Hub staff/admin: create a listing for a passport

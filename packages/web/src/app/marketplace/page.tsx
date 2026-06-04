@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CountUp } from '@/components/ui/count-up';
+import { Recycle, Leaf } from 'lucide-react';
 
 const CONDITION_COLORS: Record<string, 'default' | 'success' | 'warning' | 'outline'> = {
   A: 'success',
@@ -29,9 +31,11 @@ export default function MarketplacePage() {
   const [conditionGrade, setConditionGrade] = useState('');
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
+  const [stats, setStats] = useState<{ totalCarbonSavedKg: number; activeCount: number } | null>(null);
 
   useEffect(() => {
     setUser(getUser());
+    marketplace.stats().then(setStats).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -106,6 +110,16 @@ export default function MarketplacePage() {
           </p>
         </div>
 
+        {stats && stats.totalCarbonSavedKg > 0 && (
+          <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800 motion-safe:animate-fade-in-up">
+            <Recycle className="h-4 w-4 shrink-0" />
+            <span>
+              <CountUp value={stats.totalCarbonSavedKg} className="font-bold" /> kg CO₂e saved across{' '}
+              {stats.activeCount} material{stats.activeCount !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-wrap gap-3">
           <input
@@ -170,45 +184,48 @@ export default function MarketplacePage() {
             <p className="text-sm text-gray-500">{total} listing{total !== 1 ? 's' : ''}</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {items.map((listing) => (
-                <Link key={listing.id} href={`/marketplace/${listing.id}`}>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                    <CardContent className="p-4 space-y-3">
-                      {listing.passport.qrCodeUrl && (
-                        <div className="aspect-square bg-gray-100 rounded-md overflow-hidden">
-                          <img
-                            src={listing.passport.qrCodeUrl}
-                            alt="QR"
-                            className="w-full h-full object-contain p-2 opacity-40"
-                          />
+                <Link key={listing.id} href={`/marketplace/${listing.id}`} className="group block h-full">
+                  <Card className="h-full overflow-hidden cursor-pointer transition-all group-hover:shadow-lg motion-safe:group-hover:-translate-y-0.5">
+                    <div className="relative aspect-square overflow-hidden bg-gray-100">
+                      {listing.passport.photo ? (
+                        <img
+                          src={listing.passport.photo}
+                          alt={listing.passport.productName}
+                          className="h-full w-full object-cover transition-transform duration-300 motion-safe:group-hover:scale-105"
+                        />
+                      ) : listing.passport.qrCodeUrl ? (
+                        <img src={listing.passport.qrCodeUrl} alt="" className="h-full w-full object-contain p-6 opacity-30" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-gray-300">
+                          <Leaf className="h-10 w-10" />
                         </div>
                       )}
-                      <div>
-                        <p className="font-semibold text-sm leading-tight">
-                          {listing.passport.productName}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {listing.passport.categoryL1}
-                          {listing.passport.categoryL2 ? ` · ${listing.passport.categoryL2}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-brand-700">
-                          {formatPrice(listing.pricePence)}
+                      {listing.passport.carbonSavingsVsNew && (
+                        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-green-600/90 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+                          <Leaf className="h-3 w-3" /> {listing.passport.carbonSavingsVsNew} kgCO₂e
                         </span>
-                        {listing.passport.conditionGrade && (
-                          <Badge variant={CONDITION_COLORS[listing.passport.conditionGrade] ?? 'outline'}>
-                            Grade {listing.passport.conditionGrade}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400">
-                        {listing.organisation.name}
-                        {listing.passport.carbonSavingsVsNew && (
-                          <span className="text-green-600 ml-1">
-                            · {listing.passport.carbonSavingsVsNew} kgCO₂e saved
-                          </span>
-                        )}
+                      )}
+                      {listing.passport.conditionGrade && (
+                        <Badge
+                          variant={CONDITION_COLORS[listing.passport.conditionGrade] ?? 'outline'}
+                          className="absolute right-2 top-2"
+                        >
+                          Grade {listing.passport.conditionGrade}
+                        </Badge>
+                      )}
+                    </div>
+                    <CardContent className="p-4 space-y-1">
+                      <p className="font-semibold text-sm leading-tight line-clamp-1">
+                        {listing.passport.productName}
                       </p>
+                      <p className="text-xs text-gray-500">
+                        {listing.passport.categoryL1}
+                        {listing.passport.categoryL2 ? ` · ${listing.passport.categoryL2}` : ''}
+                      </p>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-lg font-bold text-brand-700">{formatPrice(listing.pricePence)}</span>
+                        <span className="text-xs text-gray-400 truncate max-w-[55%]">{listing.organisation.name}</span>
+                      </div>
                     </CardContent>
                   </Card>
                 </Link>

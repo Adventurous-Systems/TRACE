@@ -364,6 +364,7 @@ export interface ListingPassport {
   conditionNotes: string | null;
   carbonSavingsVsNew: string | null;
   qrCodeUrl: string | null;
+  photo?: string | null;
 }
 
 export interface ListingShippingOption {
@@ -465,6 +466,9 @@ export interface BlockchainTransactionsResponse {
 export const marketplace = {
   search: (params: URLSearchParams) =>
     request<MarketplaceListResponse>(`/api/v1/marketplace/listings?${params.toString()}`),
+
+  stats: () =>
+    request<{ totalCarbonSavedKg: number; activeCount: number }>('/api/v1/marketplace/stats'),
 
   hubListings: (token: string) =>
     request<ListingSummary[]>('/api/v1/marketplace/listings/hub', { token }),
