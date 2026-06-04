@@ -31,7 +31,7 @@ test.describe('Buyer journey', () => {
     await expect(offer).toBeVisible();
     await offer.click();
 
-    await expect(page.getByText(/offer placed/i)).toBeVisible();
+    await expect(page.getByText(/offer placed/i).first()).toBeVisible();
 
     // The Orders list shows the order (price + buyer role), not the passport name.
     await page.goto('/transactions');

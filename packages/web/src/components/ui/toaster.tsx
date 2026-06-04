@@ -41,7 +41,8 @@ export function Toaster() {
           </ToastPrimitive.Close>
         </ToastPrimitive.Root>
       ))}
-      <ToastPrimitive.Viewport className="fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col gap-2 p-4 sm:max-w-sm" />
+      {/* Top-right, clear of the sticky header — avoids covering bottom-aligned action buttons. */}
+      <ToastPrimitive.Viewport className="fixed top-0 right-0 z-[100] flex max-h-screen w-full flex-col gap-2 p-4 pt-20 sm:max-w-sm" />
     </ToastPrimitive.Provider>
   );
 }
