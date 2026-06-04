@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Fingerprint, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Fingerprint, AlertTriangle, Leaf, Camera, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { passports, type PassportCertificate } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
 import { celebrate } from '@/lib/confetti';
@@ -69,6 +70,22 @@ type WizardForm = z.infer<typeof WizardSchema>;
 
 const STORAGE_KEY = 'trace_register_wizard';
 
+// Indicative kgCO₂e saved per kg of reused material vs new — used only to
+// pre-fill a *suggested* value the user can edit. Not an authoritative figure.
+const CARBON_FACTOR_PER_KG: Record<string, number> = {
+  'structural-steel': 1.9,
+  'structural-timber': 0.7,
+  masonry: 0.22,
+  roofing: 0.45,
+  cladding: 0.6,
+  insulation: 1.2,
+  'doors-windows': 0.8,
+  flooring: 0.5,
+  mep: 1.5,
+  fixings: 1.0,
+};
+const DEFAULT_CARBON_FACTOR = 0.5;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function RegisterWizard() {
@@ -79,6 +96,14 @@ export default function RegisterWizard() {
   const [certificate, setCertificate] = useState<PassportCertificate | null>(null);
   const celebratedRef = useRef(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  function addPhotoFiles(files: FileList | null) {
+    if (!files) return;
+    const images = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (images.length) setPhotos((prev) => [...prev, ...images]);
+  }
 
   const {
     register,
@@ -97,6 +122,15 @@ export default function RegisterWizard() {
   });
 
   const selectedL1 = watch('categoryL1');
+
+  // Live values powering the preview + the carbon suggestion.
+  const formValues = watch();
+  const previewCategory = MATERIAL_CATEGORIES.find((c) => c.slug === formValues.categoryL1)?.label;
+  const weightNum = Number(formValues.dimensionWeight) || 0;
+  const suggestedCarbon =
+    weightNum > 0
+      ? Math.round(weightNum * (CARBON_FACTOR_PER_KG[formValues.categoryL1 ?? ''] ?? DEFAULT_CARBON_FACTOR) * 100) / 100
+      : null;
   const l2Options =
     MATERIAL_CATEGORIES.find((c) => c.slug === selectedL1)?.subcategories ?? [];
 
@@ -216,6 +250,14 @@ export default function RegisterWizard() {
       };
 
       const passport = await passports.create(payload, token);
+      // Upload any photos staged in the wizard (non-blocking on individual failures).
+      for (const file of photos) {
+        try {
+          await passports.uploadPhoto(passport.id, file, token);
+        } catch {
+          /* a failed photo shouldn't block the flow */
+        }
+      }
       localStorage.removeItem(STORAGE_KEY);
       setCreatedPassportId(passport.id);
       setCertificate(null);
@@ -226,8 +268,40 @@ export default function RegisterWizard() {
     }
   }
 
+  const preview = (
+    <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400">Live preview</p>
+      <div className="rounded-lg border bg-gradient-to-b from-brand-50 to-white p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-brand-700">Material passport</span>
+          <ShieldCheck className="h-4 w-4 text-gray-300" />
+        </div>
+        <p className="mt-2 text-sm font-semibold leading-tight">{formValues.productName || 'Your material'}</p>
+        <p className="text-xs text-gray-500">
+          {previewCategory || 'Category'}
+          {formValues.categoryL2 ? ` · ${formValues.categoryL2}` : ''}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {formValues.conditionGrade && <Badge variant="success">Grade {formValues.conditionGrade}</Badge>}
+          {formValues.carbonSavingsVsNew ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              <Leaf className="h-3 w-3" /> {formValues.carbonSavingsVsNew} kgCO₂e
+            </span>
+          ) : null}
+          {photos.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+              <Camera className="h-3 w-3" /> {photos.length}
+            </span>
+          )}
+        </div>
+        <p className="mt-3 border-t pt-2 text-[10px] text-gray-400">Tamper-evident trust record prepared on submit</p>
+      </div>
+    </div>
+  );
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-2xl mx-auto">
+    <div className="mx-auto max-w-5xl lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="min-w-0">
       {/* Progress bar */}
       <div className="flex items-center gap-2 mb-8">
         {STEPS.map((s, i) => (
@@ -576,6 +650,15 @@ export default function RegisterWizard() {
                   placeholder="0.00"
                   {...register('carbonSavingsVsNew')}
                 />
+                {suggestedCarbon != null && (
+                  <button
+                    type="button"
+                    onClick={() => setValue('carbonSavingsVsNew', suggestedCarbon as never)}
+                    className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline"
+                  >
+                    <Leaf className="h-3 w-3" /> Suggest ~{suggestedCarbon} kgCO₂e (from {weightNum} kg)
+                  </button>
+                )}
               </div>
             </div>
 
@@ -635,6 +718,48 @@ export default function RegisterWizard() {
                 </dl>
               );
             })()}
+
+            {/* Optional in-wizard photos (drag-drop / mobile camera) — uploaded on submit. */}
+            <div className="space-y-2">
+              <Label>Photos (optional)</Label>
+              <div
+                onClick={() => photoInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => { e.preventDefault(); addPhotoFiles(e.dataTransfer.files); }}
+                className="cursor-pointer rounded-lg border-2 border-dashed border-gray-200 p-4 text-center transition-colors hover:border-brand-300 hover:bg-brand-50/40"
+              >
+                <Camera className="mx-auto h-6 w-6 text-gray-400" />
+                <p className="mt-1 text-xs text-gray-500">Tap to take a photo or drop images here</p>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { addPhotoFiles(e.target.files); e.target.value = ''; }}
+                />
+              </div>
+              {photos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {photos.map((f, i) => (
+                    <div key={i} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={URL.createObjectURL(f)} alt="" className="h-14 w-14 rounded-md border object-cover" />
+                      <button
+                        type="button"
+                        aria-label="Remove photo"
+                        onClick={() => setPhotos((p) => p.filter((_, idx) => idx !== i))}
+                        className="absolute -right-1.5 -top-1.5 rounded-full bg-white border p-0.5 text-gray-500 shadow-sm hover:text-gray-800"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-400">A photo is required before listing — add one now or later.</p>
+            </div>
 
             {error && (
               <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
@@ -753,6 +878,8 @@ export default function RegisterWizard() {
           </>
         )}
       </div>
-    </form>
+      </form>
+      <aside className="hidden lg:block lg:sticky lg:top-20">{preview}</aside>
+    </div>
   );
 }
