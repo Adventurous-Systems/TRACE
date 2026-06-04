@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { marketplace, passports, type PassportSummary, ApiError } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
+import { toast } from '@/components/ui/use-toast';
+import { celebrate } from '@/lib/confetti';
 
 export default function NewListingPage() {
   const router = useRouter();
@@ -75,6 +77,8 @@ export default function NewListingPage() {
     setError('');
     try {
       await marketplace.createListing(payload, token);
+      toast({ title: 'Listed on the marketplace', description: 'Your material is now visible to buyers.', variant: 'success' });
+      void celebrate();
       router.push('/listings');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to create listing');

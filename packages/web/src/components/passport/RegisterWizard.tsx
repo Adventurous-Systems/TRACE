@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { passports, type PassportCertificate } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
 import { celebrate } from '@/lib/confetti';
+import { toast } from '@/components/ui/use-toast';
 
 // ─── Wizard steps ────────────────────────────────────────────────────────────
 
@@ -219,6 +220,7 @@ export default function RegisterWizard() {
       setCreatedPassportId(passport.id);
       setCertificate(null);
       setStep('verification');
+      toast({ title: 'Material passport created', description: 'Preparing its tamper-evident trust record…', variant: 'success' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     }

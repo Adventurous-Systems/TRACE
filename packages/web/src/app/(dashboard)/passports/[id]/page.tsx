@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { passports, quality, type PassportDetail, type QualityReportSummary } from '@/lib/api-client';
 import { getToken, isHubStaff, isSupplier, getUser } from '@/lib/auth';
+import { toast } from '@/components/ui/use-toast';
 import CertificatePanel from '@/components/passport/CertificatePanel';
 
 const GRADE_COLORS: Record<string, string> = {
@@ -80,6 +81,7 @@ export default function PassportDetailPage() {
     try {
       const updated = await passports.uploadPhoto(id, file, token);
       setPassport(updated);
+      toast({ title: 'Photo added', variant: 'success' });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
     } finally {

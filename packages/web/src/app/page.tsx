@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ScrollText, ShieldCheck, Recycle, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function HomePage() {
@@ -41,8 +42,8 @@ export default function HomePage() {
             </Button>
           </Link>
           <Link href="/scan">
-            <Button variant="outline" size="lg">
-              Scan QR code
+            <Button variant="outline" size="lg" className="gap-2">
+              <QrCode className="h-5 w-5" /> Scan QR code
             </Button>
           </Link>
         </div>
@@ -52,23 +53,25 @@ export default function HomePage() {
         <div className="grid md:grid-cols-3 gap-8">
           {[
             {
-              icon: '🏗️',
+              Icon: ScrollText,
               title: 'EU DPP Compliant',
               desc: 'Every passport follows EU Digital Product Passport standards, ready for 2027 regulation.',
             },
             {
-              icon: '⛓️',
+              Icon: ShieldCheck,
               title: 'Blockchain Anchored',
               desc: 'Integrity proofs on VeChainThor — anyone can verify a passport has not been tampered with.',
             },
             {
-              icon: '♻️',
+              Icon: Recycle,
               title: 'Circular Economy',
               desc: 'Track deconstruction origin, condition grades, carbon savings, and reuse history.',
             },
           ].map((f) => (
-            <div key={f.title} className="bg-white rounded-xl border p-6">
-              <div className="text-3xl mb-3">{f.icon}</div>
+            <div key={f.title} className="bg-white rounded-xl border p-6 transition-shadow hover:shadow-md motion-safe:animate-fade-in-up">
+              <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
+                <f.Icon className="h-6 w-6" />
+              </div>
               <h3 className="font-semibold text-lg mb-2">{f.title}</h3>
               <p className="text-gray-500 text-sm">{f.desc}</p>
             </div>

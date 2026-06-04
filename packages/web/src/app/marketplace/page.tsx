@@ -7,6 +7,7 @@ import { marketplace, type ListingSummary } from '@/lib/api-client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const CONDITION_COLORS: Record<string, 'default' | 'success' | 'warning' | 'outline'> = {
   A: 'success',
@@ -151,7 +152,15 @@ export default function MarketplacePage() {
 
         {/* Listings grid */}
         {loading ? (
-          <div className="py-16 text-center text-gray-400 text-sm">Loading…</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="rounded-lg border p-4 space-y-3">
+                <Skeleton className="aspect-square w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-gray-400">No listings match your search.</p>

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { marketplace, type ListingSummary, ApiError } from '@/lib/api-client';
 import { getToken, getUser, type StoredUser } from '@/lib/auth';
+import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,6 +51,7 @@ export default function ListingDetailPage() {
       if (notes) offerPayload.notes = notes;
       await marketplace.makeOffer(offerPayload, token);
       setSuccess('Offer placed. The seller will be notified. Check your Orders for updates.');
+      toast({ title: 'Offer placed', description: 'The seller will be notified.', variant: 'success' });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to place offer');
     } finally {
