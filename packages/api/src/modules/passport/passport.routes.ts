@@ -8,6 +8,7 @@ import {
   listPassports,
   updatePassport,
   verifyPassport,
+  verifyPassportIntegrity,
   getPassportHistory,
   uploadPassportPhoto,
   getPassportCertificate,
@@ -118,6 +119,16 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       const passport = await verifyPassport(request.params.id);
       return reply.send({ success: true, data: passport });
+    },
+  );
+
+  // ── GET /api/v1/passports/:id/verify-integrity ────────────────────────────
+  // Public — recompute the canonical fingerprint and compare to the stored one
+  app.get<{ Params: { id: string } }>(
+    '/:id/verify-integrity',
+    async (request, reply) => {
+      const result = await verifyPassportIntegrity(request.params.id);
+      return reply.send({ success: true, data: result });
     },
   );
 

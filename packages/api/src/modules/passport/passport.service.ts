@@ -317,6 +317,30 @@ function uuidToBytes32(uuid: string): string {
   return '0x' + uuid.replace(/-/g, '').padStart(64, '0');
 }
 
+export interface PassportIntegrityResult {
+  match: boolean;
+  recomputedHash: string;
+  storedHash: string | null;
+}
+
+/**
+ * Recompute the passport's canonical fingerprint and compare to the stored one.
+ * An honest tamper check (recompute + compare) — not an on-chain assertion.
+ */
+export async function verifyPassportIntegrity(passportId: string): Promise<PassportIntegrityResult> {
+  const passport = await db.query.materialPassports.findFirst({
+    where: eq(materialPassports.id, passportId),
+  });
+  if (!passport) throw new NotFoundError(`Passport ${passportId} not found`);
+  const recomputedHash = computePassportHash(passport);
+  const storedHash = passport.blockchainPassportHash;
+  return {
+    match: storedHash !== null && recomputedHash === storedHash,
+    recomputedHash,
+    storedHash,
+  };
+}
+
 export async function verifyPassport(passportId: string): Promise<PassportWithVerification> {
   const passport = await db.query.materialPassports.findFirst({
     where: eq(materialPassports.id, passportId),

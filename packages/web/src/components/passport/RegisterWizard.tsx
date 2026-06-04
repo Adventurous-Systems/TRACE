@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { ShieldCheck, Fingerprint, AlertTriangle } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { passports, type PassportCertificate } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
+import { celebrate } from '@/lib/confetti';
 
 // ─── Wizard steps ────────────────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ export default function RegisterWizard() {
   const [error, setError] = useState<string | null>(null);
   const [createdPassportId, setCreatedPassportId] = useState<string | null>(null);
   const [certificate, setCertificate] = useState<PassportCertificate | null>(null);
+  const celebratedRef = useRef(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
   const {
@@ -144,6 +147,14 @@ export default function RegisterWizard() {
       window.clearInterval(interval);
     };
   }, [createdPassportId, step]);
+
+  // One-time celebration when the trust record becomes ready.
+  useEffect(() => {
+    if (!celebratedRef.current && (certificate?.status === 'verified' || certificate?.status === 'simulated')) {
+      celebratedRef.current = true;
+      void celebrate();
+    }
+  }, [certificate?.status]);
 
   const currentIndex = STEPS.findIndex((s) => s.id === step);
 
@@ -641,23 +652,23 @@ export default function RegisterWizard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="rounded-lg border bg-white p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <div className="h-4 w-2/3 rounded bg-gray-100" />
-                  <div className="h-3 w-1/2 rounded bg-gray-100" />
-                  <div className="h-3 w-5/6 rounded bg-gray-100" />
+            <div className="flex flex-col items-center text-center py-2">
+              {certificate?.status === 'verified' || certificate?.status === 'simulated' ? (
+                <div className="relative">
+                  <span className="absolute inset-0 rounded-full bg-green-400/40 motion-safe:animate-ring-pulse" />
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700 motion-safe:animate-seal-pop">
+                    <ShieldCheck className="h-8 w-8" />
+                  </div>
                 </div>
-                <div
-                  className={`h-10 w-10 rounded-full ${
-                    certificate?.status === 'verified' || certificate?.status === 'simulated'
-                      ? 'bg-green-100'
-                      : certificate?.status === 'failed'
-                        ? 'bg-red-100'
-                        : 'bg-yellow-100 animate-pulse'
-                  }`}
-                />
-              </div>
+              ) : certificate?.status === 'failed' ? (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600">
+                  <AlertTriangle className="h-8 w-8" />
+                </div>
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
+                  <Fingerprint className="h-8 w-8 animate-pulse" />
+                </div>
+              )}
             </div>
 
             <div
