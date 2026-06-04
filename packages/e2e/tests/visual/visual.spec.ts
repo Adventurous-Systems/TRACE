@@ -45,6 +45,8 @@ test.describe('Visual — seller pages', () => {
     await page.goto('/passports/new');
     await expect(page.getByText('Basic information')).toBeVisible();
     await page.waitForLoadState('networkidle');
+    // let the client-hydrated live-preview sidebar settle before snapshotting
+    await page.waitForTimeout(800);
     await expect(page).toHaveScreenshot('passport-wizard.png', { fullPage: true });
   });
 });
