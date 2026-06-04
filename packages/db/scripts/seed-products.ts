@@ -27,7 +27,7 @@ import { readFileSync } from 'fs';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq, sql as dsql } from 'drizzle-orm';
-import * as sha3 from 'js-sha3';
+import { createRequire } from 'module';
 import * as Minio from 'minio';
 import * as schema from '../drizzle/schema.js';
 import type { MaterialPassport, NewMaterialPassport } from '../drizzle/schema.js';
@@ -275,7 +275,8 @@ function buildCanonicalJsonLd(passport: MaterialPassport): string {
   const sorted = Object.fromEntries(Object.entries(doc).sort(([a], [b]) => a.localeCompare(b)));
   return JSON.stringify(sorted);
 }
-const computeHash = (p: MaterialPassport): string => '0x' + sha3.keccak256(buildCanonicalJsonLd(p));
+const { keccak256 } = createRequire(import.meta.url)('js-sha3') as { keccak256: (s: string) => string };
+const computeHash = (p: MaterialPassport): string => '0x' + keccak256(buildCanonicalJsonLd(p));
 
 // ── MinIO ─────────────────────────────────────────────────────────────────────
 function makeMinio() {

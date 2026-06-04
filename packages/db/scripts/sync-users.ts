@@ -28,7 +28,7 @@ import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { eq, sql as dsql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import * as schema from '../drizzle/schema.js';
 
@@ -125,27 +125,10 @@ async function main() {
           .where(eq(schema.materialPassports.registeredBy, uid));
 
         await tx.delete(schema.users).where(eq(schema.users.id, uid));
-
-        if (user.organisationId) {
-          const usersRows = await tx
-            .select({ count: dsql<number>`count(*)::int` })
-            .from(schema.users)
-            .where(eq(schema.users.organisationId, user.organisationId));
-          const passportsRows = await tx
-            .select({ count: dsql<number>`count(*)::int` })
-            .from(schema.materialPassports)
-            .where(eq(schema.materialPassports.organisationId, user.organisationId));
-          const usersLeft = usersRows[0]?.count ?? 0;
-          const passportsLeft = passportsRows[0]?.count ?? 0;
-          if (usersLeft === 0 && passportsLeft === 0) {
-            await tx.delete(schema.organisations).where(eq(schema.organisations.id, user.organisationId));
-            console.log(`  ✓ removed ${email} + its empty organisation`);
-          } else {
-            console.log(`  ✓ removed ${email} (kept shared org: ${usersLeft} users, ${passportsLeft} passports left)`);
-          }
-        } else {
-          console.log(`  ✓ removed ${email}`);
-        }
+        // Their organisation is intentionally left in place — a userless org is
+        // harmless, and deleting it would drag in audit_events / blockchain_txn
+        // org references that we want to keep for history.
+        console.log(`  ✓ removed ${email}`);
       });
     }
 
