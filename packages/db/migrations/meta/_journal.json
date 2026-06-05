@@ -43,6 +43,13 @@
       "when": 1780062094208,
       "tag": "0005_warm_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780490000000,
+      "tag": "0006_unit_of_measure",
+      "breakpoints": true
     }
   ]
 }

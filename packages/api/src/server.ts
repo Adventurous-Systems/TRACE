@@ -47,7 +47,7 @@ export async function buildApp() {
 
   await app.register(multipart, {
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10 MB
+      fileSize: 20 * 1024 * 1024, // 20 MB — modern phone photos can exceed 10 MB
       files: 10,
     },
   });

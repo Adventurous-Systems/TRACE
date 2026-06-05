@@ -174,7 +174,13 @@ export async function passportRoutes(app: FastifyInstance): Promise<void> {
         });
       }
 
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+      // Broad gate; the service re-encodes everything to JPEG via sharp (which is the
+      // real validator). Some mobile browsers send HEIC as image/heif or with a generic
+      // application/octet-stream type, so accept those too.
+      const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif',
+        'application/octet-stream',
+      ];
       if (!allowedTypes.includes(file.mimetype)) {
         return reply.status(400).send({
           success: false,

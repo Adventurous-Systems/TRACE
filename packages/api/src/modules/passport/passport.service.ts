@@ -12,8 +12,11 @@ import {
   type PassportQueryInput,
   NotFoundError,
   ForbiddenError,
+  ConflictError,
+  ValidationError,
 } from '@trace/core';
 import QRCode from 'qrcode';
+import sharp from 'sharp';
 import { ThorClient } from '@vechain/sdk-network';
 import { ABIFunction } from '@vechain/sdk-core';
 import { anchorQueue } from '../../lib/queue.js';
@@ -237,6 +240,16 @@ export async function updatePassport(
     throw new ForbiddenError('You do not have permission to update this passport');
   }
 
+  // Editable only while draft/active. Once a passport is listed, reserved, sold, or
+  // decommissioned its published record is final — amendments are locked so the traded
+  // record stays trustworthy. (Edits before this point are append-only amendments that
+  // recompute the tamper-evident fingerprint; see the passport_events history.)
+  if (['listed', 'reserved', 'sold', 'decommissioned'].includes(existing.status)) {
+    throw new ConflictError(
+      `This material can no longer be edited because it is ${existing.status}. Editing is locked once a material is listed or sold.`,
+    );
+  }
+
   // Build update set, filtering out undefined values (partial update)
   const rawUpdate = buildInsertValues(input);
   const updateSet: Record<string, unknown> = {
@@ -257,7 +270,10 @@ export async function updatePassport(
 
   if (!updated) throw new Error('Update failed');
 
-  // Log amendment event
+  // Log amendment event — append-only history. Record the recomputed fingerprint so
+  // each version is fully auditable off-chain (mirrors the on-chain PassportHashUpdated
+  // event once anchoring is live).
+  const amendedHash = computePassportHash(updated);
   await db.insert(passportEvents).values({
     passportId,
     eventType: 'ObjectEvent',
@@ -266,6 +282,7 @@ export async function updatePassport(
       bizStep: 'urn:epcglobal:cbv:bizstep:inspecting',
       disposition: 'urn:epcglobal:cbv:disp:active',
       amendment: true,
+      fingerprint: amendedHash,
     },
     actorId: userId,
   });
@@ -461,6 +478,7 @@ function buildInsertValues(input: CreatePassportInput | UpdatePassportInput): In
     productName: input.productName,
     categoryL1: input.categoryL1,
     categoryL2: input.categoryL2 ?? null,
+    unitOfMeasure: input.unitOfMeasure ?? null,
     // Cast JSONB arrays/objects to bypass exactOptionalPropertyTypes friction
     materialComposition: (input.materialComposition ?? []) as unknown,
     dimensions: (input.dimensions ?? null) as unknown,
@@ -498,7 +516,7 @@ function buildInsertValues(input: CreatePassportInput | UpdatePassportInput): In
 export async function uploadPassportPhoto(
   passportId: string,
   buffer: Buffer,
-  mimetype: string,
+  _mimetype: string,
   organisationId: string,
 ): Promise<MaterialPassport> {
   const passport = await db.query.materialPassports.findFirst({
@@ -508,9 +526,22 @@ export async function uploadPassportPhoto(
   if (!passport) throw new NotFoundError(`Passport ${passportId} not found`);
   if (passport.organisationId !== organisationId) throw new ForbiddenError('Access denied');
 
-  const ext = mimetype.split('/')[1] ?? 'jpg';
-  const key = `passports/${passportId}/photos/${Date.now()}.${ext}`;
-  const photoUrl = await uploadBuffer(env.MINIO_BUCKET_PASSPORTS, key, buffer, mimetype);
+  // Normalise to JPEG: sharp decodes HEIC/HEIF + other formats, applies EXIF
+  // orientation, and downscales large camera photos — so any phone/laptop image
+  // ends up browser-displayable and a modest size.
+  let normalised: Buffer;
+  try {
+    normalised = await sharp(buffer)
+      .rotate()
+      .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+  } catch {
+    throw new ValidationError('Could not process the image — please upload a valid JPEG, PNG, WebP, or HEIC photo');
+  }
+
+  const key = `passports/${passportId}/photos/${Date.now()}.jpg`;
+  const photoUrl = await uploadBuffer(env.MINIO_BUCKET_PASSPORTS, key, normalised, 'image/jpeg');
 
   const existing = (passport.conditionPhotos ?? []) as string[];
 

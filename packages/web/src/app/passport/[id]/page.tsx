@@ -1,10 +1,11 @@
 import { passports, type PassportCertificate, type PassportDetail } from '@/lib/api-client';
+import { unitLabel } from '@trace/core';
 import { Leaf, Clock, Recycle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Logo } from '@/components/ui/Logo';
 import CertificatePanel from '@/components/passport/CertificatePanel';
-import ProvenanceTimeline from '@/components/passport/ProvenanceTimeline';
+import ProvenanceTimeline, { type AmendmentEntry } from '@/components/passport/ProvenanceTimeline';
 import Link from 'next/link';
 
 interface Props {
@@ -27,10 +28,27 @@ async function getCertificate(id: string): Promise<PassportCertificate | null> {
   }
 }
 
+// Append-only amendments, oldest-first, for the provenance timeline.
+async function getAmendments(id: string): Promise<AmendmentEntry[]> {
+  try {
+    const events = (await passports.history(id)) as Array<{
+      eventData?: { amendment?: boolean };
+      createdAt?: string;
+    }>;
+    return events
+      .filter((e) => e.eventData?.amendment === true)
+      .map((e) => ({ date: e.createdAt ?? null }))
+      .reverse(); // history comes newest-first; the timeline reads oldest-first
+  } catch {
+    return [];
+  }
+}
+
 export default async function PublicPassportPage({ params }: Props) {
-  const [passport, certificate] = await Promise.all([
+  const [passport, certificate, amendments] = await Promise.all([
     getPassport(params.id),
     getCertificate(params.id),
+    getAmendments(params.id),
   ]);
 
   if (!passport) {
@@ -125,7 +143,9 @@ export default async function PublicPassportPage({ params }: Props) {
             <div className="rounded-xl border bg-green-50 p-4">
               <Leaf className="h-5 w-5 text-green-600" />
               <p className="mt-2 text-2xl font-bold text-green-700">{passport.carbonSavingsVsNew}</p>
-              <p className="text-xs text-gray-500">kgCO₂e saved vs new</p>
+              <p className="text-xs text-gray-500">
+                kgCO₂e saved vs new{passport.unitOfMeasure ? ` · per ${unitLabel(passport.unitOfMeasure)}` : ''}
+              </p>
             </div>
           )}
           {passport.conditionGrade && (
@@ -155,7 +175,7 @@ export default async function PublicPassportPage({ params }: Props) {
 
         <div className="grid md:grid-cols-2 gap-6">
           <CertificatePanel passportId={passport.id} initialCertificate={certificate} />
-          <ProvenanceTimeline passport={passport} />
+          <ProvenanceTimeline passport={passport} amendments={amendments} />
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -219,9 +239,10 @@ export default async function PublicPassportPage({ params }: Props) {
               <CardContent>
                 <dl className="text-sm space-y-2">
                   {[
-                    ['GWP total', passport.gwpTotal ? `${passport.gwpTotal} kgCO₂e` : null],
-                    ['Embodied carbon', passport.embodiedCarbon ? `${passport.embodiedCarbon} kgCO₂e` : null],
-                    ['Carbon savings vs new', passport.carbonSavingsVsNew ? `${passport.carbonSavingsVsNew} kgCO₂e` : null],
+                    ['Sold / measured per', passport.unitOfMeasure ? unitLabel(passport.unitOfMeasure) : null],
+                    ['GWP total', passport.gwpTotal ? `${passport.gwpTotal} kgCO₂e${passport.unitOfMeasure ? ` per ${unitLabel(passport.unitOfMeasure)}` : ''}` : null],
+                    ['Embodied carbon', passport.embodiedCarbon ? `${passport.embodiedCarbon} kgCO₂e${passport.unitOfMeasure ? ` per ${unitLabel(passport.unitOfMeasure)}` : ''}` : null],
+                    ['Carbon savings vs new', passport.carbonSavingsVsNew ? `${passport.carbonSavingsVsNew} kgCO₂e${passport.unitOfMeasure ? ` per ${unitLabel(passport.unitOfMeasure)}` : ''}` : null],
                     ['Recycled content', passport.recycledContent ? `${passport.recycledContent}%` : null],
                     ['EPD reference', passport.epdReference],
                   ].filter(([, v]) => v).map(([label, value]) => (

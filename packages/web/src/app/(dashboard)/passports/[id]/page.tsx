@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { passports, quality, type PassportDetail, type QualityReportSummary } from '@/lib/api-client';
+import { unitLabel } from '@trace/core';
 import { getToken, isHubStaff, isSupplier, getUser } from '@/lib/auth';
 import { toast } from '@/components/ui/use-toast';
 import CertificatePanel from '@/components/passport/CertificatePanel';
@@ -105,6 +106,11 @@ export default function PassportDetailPage() {
             <Badge variant={anchored ? 'success' : 'outline'}>
               {anchored ? 'Anchored ✓' : 'Pending anchor'}
             </Badge>
+            {canEdit && (passport.status === 'draft' || passport.status === 'active') && (
+              <Link href={`/passports/${id}/edit`}>
+                <Button variant="outline" size="sm">Edit</Button>
+              </Link>
+            )}
             {passport.status === 'active' && (
               <Link href={`/listings/new?passportId=${id}`}>
                 <Button size="sm" className="bg-brand-600 hover:bg-brand-700">
@@ -162,7 +168,7 @@ export default function PassportDetailPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                     className="hidden"
                     onChange={handlePhotoUpload}
                   />
@@ -215,9 +221,10 @@ export default function PassportDetailPage() {
                 ['Deconstruction method', passport.deconstructionMethod ?? '—'],
                 ['Reclaimed by', passport.reclaimedBy ?? '—'],
                 ['Remaining life', passport.remainingLifeEstimate ? `${passport.remainingLifeEstimate} years` : '—'],
-                ['Embodied carbon', passport.embodiedCarbon ? `${passport.embodiedCarbon} kgCO₂e` : '—'],
-                ['Carbon savings vs new', passport.carbonSavingsVsNew ? `${passport.carbonSavingsVsNew} kgCO₂e` : '—'],
-                ['GWP total', passport.gwpTotal ? `${passport.gwpTotal} kgCO₂e` : '—'],
+                ['Sold / measured per', passport.unitOfMeasure ? unitLabel(passport.unitOfMeasure) : '—'],
+                ['Embodied carbon', passport.embodiedCarbon ? `${passport.embodiedCarbon} kgCO₂e${passport.unitOfMeasure ? ` per ${unitLabel(passport.unitOfMeasure)}` : ''}` : '—'],
+                ['Carbon savings vs new', passport.carbonSavingsVsNew ? `${passport.carbonSavingsVsNew} kgCO₂e${passport.unitOfMeasure ? ` per ${unitLabel(passport.unitOfMeasure)}` : ''}` : '—'],
+                ['GWP total', passport.gwpTotal ? `${passport.gwpTotal} kgCO₂e${passport.unitOfMeasure ? ` per ${unitLabel(passport.unitOfMeasure)}` : ''}` : '—'],
                 ['Recycled content', passport.recycledContent ? `${passport.recycledContent}%` : '—'],
                 ['CE marking', passport.ceMarking ? 'Yes' : 'No'],
               ].map(([label, value]) => (

@@ -4,6 +4,7 @@ import {
   PASSPORT_STATUSES,
   CONDITION_GRADES,
   DECONSTRUCTION_METHODS,
+  UNITS_OF_MEASURE,
 } from '../constants/config.js';
 
 const l1Slugs = MATERIAL_CATEGORIES.map((c) => c.slug) as [string, ...string[]];
@@ -37,6 +38,7 @@ export const CreatePassportSchema = z.object({
   categoryL2: z.string().optional(),
 
   // Product — optional
+  unitOfMeasure: z.enum(UNITS_OF_MEASURE).optional(), // basis for quantity / price / carbon
   materialComposition: z.array(MaterialComponentSchema).optional(),
   dimensions: DimensionsSchema.optional(),
   technicalSpecs: z.record(z.unknown()).optional(),

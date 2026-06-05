@@ -106,6 +106,7 @@ export const materialPassports = pgTable(
     productName: text('product_name').notNull(),
     categoryL1: text('category_l1').notNull(),
     categoryL2: text('category_l2'),
+    unitOfMeasure: text('unit_of_measure'),
     materialComposition: jsonb('material_composition')
       .$type<Array<{ material: string; percentage?: number; recycled?: boolean }>>()
       .default([]),

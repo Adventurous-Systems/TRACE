@@ -96,6 +96,7 @@ export interface ListingWithPassport extends Listing {
     productName: string;
     categoryL1: string;
     categoryL2: string | null;
+    unitOfMeasure: string | null;
     conditionGrade: string | null;
     conditionNotes: string | null;
     carbonSavingsVsNew: string | null;
@@ -117,6 +118,7 @@ export async function getListingById(listingId: string): Promise<ListingWithPass
           productName: true,
           categoryL1: true,
           categoryL2: true,
+          unitOfMeasure: true,
           conditionGrade: true,
           conditionNotes: true,
           carbonSavingsVsNew: true,
@@ -187,6 +189,7 @@ export async function searchListings(
       passportProductName: materialPassports.productName,
       passportCategoryL1: materialPassports.categoryL1,
       passportCategoryL2: materialPassports.categoryL2,
+      passportUnitOfMeasure: materialPassports.unitOfMeasure,
       passportConditionGrade: materialPassports.conditionGrade,
       passportConditionNotes: materialPassports.conditionNotes,
       passportCarbonSavingsVsNew: materialPassports.carbonSavingsVsNew,
@@ -231,6 +234,7 @@ export async function searchListings(
       productName: row.passportProductName,
       categoryL1: row.passportCategoryL1,
       categoryL2: row.passportCategoryL2,
+      unitOfMeasure: row.passportUnitOfMeasure,
       conditionGrade: row.passportConditionGrade,
       conditionNotes: row.passportConditionNotes,
       carbonSavingsVsNew: row.passportCarbonSavingsVsNew,
@@ -275,6 +279,7 @@ export async function listHubListings(
           productName: true,
           categoryL1: true,
           categoryL2: true,
+          unitOfMeasure: true,
           conditionGrade: true,
           conditionNotes: true,
           carbonSavingsVsNew: true,

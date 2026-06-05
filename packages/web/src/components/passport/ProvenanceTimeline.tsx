@@ -1,7 +1,12 @@
-import { Factory, Hammer, Recycle, ShieldCheck, Store, CheckCircle2, type LucideIcon } from 'lucide-react';
+import { Factory, Hammer, Recycle, ShieldCheck, Store, CheckCircle2, PencilLine, type LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { PassportDetail } from '@/lib/api-client';
+
+/** An append-only amendment to the passport (oldest → newest). */
+export interface AmendmentEntry {
+  date?: string | null;
+}
 
 interface Step {
   icon: LucideIcon;
@@ -14,7 +19,13 @@ interface Step {
 const fmt = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : undefined);
 
 /** Honest provenance story built from the passport's own lifecycle data. */
-export default function ProvenanceTimeline({ passport }: { passport: PassportDetail }) {
+export default function ProvenanceTimeline({
+  passport,
+  amendments = [],
+}: {
+  passport: PassportDetail;
+  amendments?: AmendmentEntry[];
+}) {
   const steps: Step[] = [
     {
       icon: Factory,
@@ -39,9 +50,19 @@ export default function ProvenanceTimeline({ passport }: { passport: PassportDet
   steps.push({
     icon: ShieldCheck,
     title: 'Registered on TRACE',
-    detail: 'Tamper-evident passport issued',
+    detail: 'Tamper-evident passport issued (version 1)',
     date: fmt(passport.createdAt),
     done: true,
+  });
+  // Each edit is an append-only amendment that re-generates the fingerprint.
+  amendments.forEach((a, idx) => {
+    steps.push({
+      icon: PencilLine,
+      title: `Amended — version ${idx + 2}`,
+      detail: 'Fingerprint re-generated',
+      date: fmt(a.date),
+      done: true,
+    });
   });
   steps.push({
     icon: Store,

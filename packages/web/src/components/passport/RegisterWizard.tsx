@@ -6,7 +6,7 @@ import { ShieldCheck, Fingerprint, AlertTriangle, Leaf, Camera, X } from 'lucide
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MATERIAL_CATEGORIES, CONDITION_GRADES, DECONSTRUCTION_METHODS } from '@trace/core';
+import { MATERIAL_CATEGORIES, CONDITION_GRADES, DECONSTRUCTION_METHODS, UNITS_OF_MEASURE, UNIT_OF_MEASURE_LABELS } from '@trace/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,7 @@ const WizardSchema = z.object({
   serialNumber: z.string().optional(),
 
   // Step 2 — Specs
+  unitOfMeasure: z.enum(UNITS_OF_MEASURE).optional().or(z.literal('')),
   dimensionLength: z.coerce.number().positive().optional().or(z.literal('')),
   dimensionWidth: z.coerce.number().positive().optional().or(z.literal('')),
   dimensionHeight: z.coerce.number().positive().optional().or(z.literal('')),
@@ -236,6 +237,7 @@ export default function RegisterWizard() {
         productName: data.productName,
         categoryL1: data.categoryL1,
         categoryL2: data.categoryL2 || undefined,
+        unitOfMeasure: data.unitOfMeasure || undefined,
         manufacturerName: data.manufacturerName || undefined,
         countryOfOrigin: data.countryOfOrigin || undefined,
         conditionGrade: data.conditionGrade || undefined,
@@ -500,7 +502,7 @@ export default function RegisterWizard() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="dimensionUnit">Unit</Label>
+              <Label htmlFor="dimensionUnit">Dimension unit</Label>
               <select
                 id="dimensionUnit"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -510,6 +512,23 @@ export default function RegisterWizard() {
                 <option value="cm">cm</option>
                 <option value="m">m</option>
               </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="unitOfMeasure">Sold / measured per</Label>
+              <select
+                id="unitOfMeasure"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                {...register('unitOfMeasure')}
+              >
+                <option value="">— select —</option>
+                {UNITS_OF_MEASURE.map((u) => (
+                  <option key={u} value={u}>{UNIT_OF_MEASURE_LABELS[u]}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">
+                The basis for quantity, price, and carbon — e.g. per block (each), per m², per kg.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -656,7 +675,7 @@ export default function RegisterWizard() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="carbonSavingsVsNew">Carbon savings vs new (kgCO₂e)</Label>
+                <Label htmlFor="carbonSavingsVsNew">Carbon savings vs new (kgCO₂e per unit)</Label>
                 <Input
                   id="carbonSavingsVsNew"
                   type="number"

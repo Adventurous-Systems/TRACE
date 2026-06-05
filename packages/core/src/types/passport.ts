@@ -56,6 +56,7 @@ export interface MaterialPassport {
   productName: string;
   categoryL1: string;
   categoryL2?: string;
+  unitOfMeasure?: string;
   materialComposition?: MaterialComponent[];
   dimensions?: Dimensions;
   technicalSpecs?: Record<string, unknown>;

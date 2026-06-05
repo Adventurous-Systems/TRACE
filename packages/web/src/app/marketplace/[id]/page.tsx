@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { marketplace, type ListingSummary, ApiError } from '@/lib/api-client';
+import { unitLabel } from '@trace/core';
 import { getToken, getUser, type StoredUser } from '@/lib/auth';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
@@ -134,11 +135,13 @@ export default function ListingDetailPage() {
                   {listing.passport.carbonSavingsVsNew && (
                     <>
                       <dt className="text-gray-500">Carbon savings</dt>
-                      <dd className="text-green-600">{listing.passport.carbonSavingsVsNew} kgCO₂e</dd>
+                      <dd className="text-green-600">
+                        {listing.passport.carbonSavingsVsNew} kgCO₂e{listing.passport.unitOfMeasure ? ` per ${unitLabel(listing.passport.unitOfMeasure)}` : ''}
+                      </dd>
                     </>
                   )}
                   <dt className="text-gray-500">Quantity</dt>
-                  <dd>{listing.quantity}</dd>
+                  <dd>{listing.quantity}{listing.passport.unitOfMeasure ? ` ${unitLabel(listing.passport.unitOfMeasure)}` : ''}</dd>
                   <dt className="text-gray-500">Currency</dt>
                   <dd>{listing.currency}</dd>
                   <dt className="text-gray-500">Supplier hub</dt>

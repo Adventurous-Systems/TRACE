@@ -10,6 +10,35 @@ export const PASSPORT_STATUSES = [
 
 export const CONDITION_GRADES = ['A', 'B', 'C', 'D'] as const;
 
+// Unit a material is counted/sold by. Gives quantities, price, and carbon a clear
+// basis (e.g. "12 kgCO₂e per block", "£45 / m²").
+export const UNITS_OF_MEASURE = [
+  'each',
+  'm2',
+  'm',
+  'kg',
+  'tonne',
+  'pallet',
+  'set',
+] as const;
+
+// Human-readable labels for each unit (UI display).
+export const UNIT_OF_MEASURE_LABELS: Record<(typeof UNITS_OF_MEASURE)[number], string> = {
+  each: 'each',
+  m2: 'm²',
+  m: 'linear m',
+  kg: 'kg',
+  tonne: 'tonne',
+  pallet: 'pallet',
+  set: 'set',
+};
+
+// Display label for a stored unit-of-measure code, falling back to the raw value.
+export function unitLabel(u?: string | null): string {
+  if (!u) return '';
+  return (UNIT_OF_MEASURE_LABELS as Record<string, string>)[u] ?? u;
+}
+
 export const DECONSTRUCTION_METHODS = [
   'selective',
   'mechanical',

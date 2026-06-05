@@ -293,6 +293,7 @@ export interface PassportSummary {
   productName: string;
   categoryL1: string;
   categoryL2: string | null;
+  unitOfMeasure: string | null;
   conditionGrade: string | null;
   status: string;
   qrCodeUrl: string | null;
@@ -360,6 +361,7 @@ export interface ListingPassport {
   productName: string;
   categoryL1: string;
   categoryL2: string | null;
+  unitOfMeasure: string | null;
   conditionGrade: string | null;
   conditionNotes: string | null;
   carbonSavingsVsNew: string | null;

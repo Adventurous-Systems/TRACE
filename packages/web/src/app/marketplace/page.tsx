@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { clearSession, getUser, type StoredUser } from '@/lib/auth';
 import { marketplace, type ListingSummary } from '@/lib/api-client';
+import { unitLabel } from '@trace/core';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -199,7 +200,7 @@ export default function MarketplacePage() {
                       )}
                       {listing.passport.carbonSavingsVsNew && (
                         <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-green-600/90 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
-                          <Leaf className="h-3 w-3" /> {listing.passport.carbonSavingsVsNew} kgCO₂e
+                          <Leaf className="h-3 w-3" /> {listing.passport.carbonSavingsVsNew} kgCO₂e{listing.passport.unitOfMeasure ? `/${unitLabel(listing.passport.unitOfMeasure)}` : ''}
                         </span>
                       )}
                       {listing.passport.conditionGrade && (
