@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { Analytics } from '@/components/Analytics';
 
 export const metadata: Metadata = {
   title: 'TRACE — Material Passport Platform',
@@ -17,6 +18,13 @@ export const viewport = {
 export const dynamic = 'force-dynamic';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Read at request time (this layout is force-dynamic). Runtime-only vars — NOT
+  // NEXT_PUBLIC_* — because the Docker image is built before .env is mounted, so a
+  // NEXT_PUBLIC_ value would be inlined as undefined. We pass the id as a prop to a
+  // client component instead.
+  const umamiWebsiteId = process.env.UMAMI_WEBSITE_ID;
+  const umamiEnabled = process.env.UMAMI_ENABLED !== 'false';
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -30,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased overflow-x-clip">
         {children}
         <Toaster />
+        {umamiEnabled && umamiWebsiteId ? <Analytics websiteId={umamiWebsiteId} /> : null}
       </body>
     </html>
   );
