@@ -37,3 +37,13 @@ export function sanitizeUrl(url: string): string {
     .replace(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, '*')
     .replace(/\/[0-9a-fA-F]{16,}(?=\/|$|\?)/g, '/*');
 }
+
+/** Bucket a price (in pence) into a coarse band — never send a raw amount as an event prop. */
+export function priceBand(pence: number): string {
+  const pounds = pence / 100;
+  if (pounds < 100) return 'lt-100';
+  if (pounds < 500) return '100-500';
+  if (pounds < 2000) return '500-2000';
+  if (pounds < 10000) return '2000-10000';
+  return 'gte-10000';
+}

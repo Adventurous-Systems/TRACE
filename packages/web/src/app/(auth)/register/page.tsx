@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { auth } from '@/lib/api-client';
 import { getPostAuthRedirect, saveSession } from '@/lib/auth';
+import { track } from '@/lib/analytics';
 
 const RegisterSchema = z
   .object({
@@ -49,6 +50,7 @@ export default function RegisterPage() {
         password: data.password,
       });
       saveSession(result.token, result.user);
+      track('signup', { role: result.user.role });
       router.push(safeNextPath ?? getPostAuthRedirect(result.user));
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Registration failed');

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { clearSession, getUser, type StoredUser } from '@/lib/auth';
+import { track } from '@/lib/analytics';
 import { marketplace, type ListingSummary } from '@/lib/api-client';
 import { unitLabel } from '@trace/core';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,6 +35,7 @@ export default function MarketplacePage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<StoredUser | null>(null);
   const [stats, setStats] = useState<{ totalCarbonSavedKg: number; activeCount: number } | null>(null);
+  const searchTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setUser(getUser());
@@ -52,6 +54,21 @@ export default function MarketplacePage() {
       .then((res) => {
         setItems(res.data ?? []);
         setTotal(res.total ?? 0);
+        // Only a genuine search/filter/pagination is worth an event (not the bare
+        // marketplace landing — that's already a pageview). Debounced so a typed
+        // query collapses into one event instead of firing per keystroke.
+        if (q || categoryL1 || conditionGrade || page > 1) {
+          if (searchTrackTimer.current) clearTimeout(searchTrackTimer.current);
+          searchTrackTimer.current = setTimeout(() => {
+            track('marketplace-search', {
+              filterCategory: categoryL1 || 'all',
+              conditionGrade: conditionGrade || 'any',
+              resultsCount: res.total ?? 0,
+              page,
+              hasQuery: q.length > 0,
+            });
+          }, 600);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));

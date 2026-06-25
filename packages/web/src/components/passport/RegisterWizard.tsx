@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { passports, type PassportCertificate } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
+import { track } from '@/lib/analytics';
 import { celebrate } from '@/lib/confetti';
 import { toast } from '@/components/ui/use-toast';
 
@@ -266,6 +267,12 @@ export default function RegisterWizard() {
       };
 
       const passport = await passports.create(payload, token);
+      track('passport-create', {
+        materialCategory: data.categoryL1,
+        hasPhotos: photos.length > 0,
+        hasConditionGrade: Boolean(data.conditionGrade),
+        certified: Boolean(data.ceMarking),
+      });
       // Upload any photos staged in the wizard (non-blocking on individual failures).
       for (const file of photos) {
         try {
