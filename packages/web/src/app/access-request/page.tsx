@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ApiError, accessRequests } from '@/lib/api-client';
 import { clearSession, getSession, type StoredUser } from '@/lib/auth';
+import { track } from '@/lib/analytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -150,6 +151,10 @@ export default function AccessRequestPage() {
         },
         token,
       );
+      track('access-request', {
+        requestedRole: data.requestedRole,
+        hasNotes: Boolean(data.notes?.trim()),
+      });
       setPendingRequest({
         status: created.status,
         requestedRole: created.requestedRole,

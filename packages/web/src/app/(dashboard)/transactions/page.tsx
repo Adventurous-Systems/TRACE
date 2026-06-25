@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { marketplace, type MarketplaceTransaction, ApiError } from '@/lib/api-client';
 import { getToken, getUser } from '@/lib/auth';
+import { track } from '@/lib/analytics';
 
 const TX_STATUS_COLORS: Record<string, 'default' | 'success' | 'warning' | 'outline'> = {
   pending: 'warning',
@@ -37,6 +38,7 @@ function ActionButtons({
     setLoading(action);
     try {
       await marketplace.updateTransaction(tx.id, action, token);
+      track('transaction-update', { transactionAction: action, isBuyer: tx.buyerId === userId });
       onUpdate();
     } catch (e) {
       alert(e instanceof ApiError ? e.message : 'Action failed');
