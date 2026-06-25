@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { marketplace, type ListingSummary, ApiError } from '@/lib/api-client';
 import { unitLabel } from '@trace/core';
 import { getToken, getUser, type StoredUser } from '@/lib/auth';
+import { track, priceBand } from '@/lib/analytics';
 import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,11 @@ export default function ListingDetailPage() {
       const offerPayload: { listingId: string; notes?: string } = { listingId: params.id };
       if (notes) offerPayload.notes = notes;
       await marketplace.makeOffer(offerPayload, token);
+      track('make-offer', {
+        listingCategory: listing?.passport?.categoryL1 ?? 'unknown',
+        hasCustomNote: notes.trim().length > 0,
+        priceBand: priceBand(listing?.pricePence ?? 0),
+      });
       setSuccess('Offer placed. The seller will be notified. Check your Orders for updates.');
       toast({ title: 'Offer placed', description: 'The seller will be notified.', variant: 'success' });
     } catch (e) {

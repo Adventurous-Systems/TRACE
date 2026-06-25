@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { marketplace, passports, type PassportSummary, ApiError } from '@/lib/api-client';
 import { getToken } from '@/lib/auth';
+import { track } from '@/lib/analytics';
 import { toast } from '@/components/ui/use-toast';
 import { celebrate } from '@/lib/confetti';
 
@@ -77,6 +78,11 @@ export default function NewListingPage() {
     setError('');
     try {
       await marketplace.createListing(payload, token);
+      track('listing-create', {
+        materialCategory: availablePassports.find((p) => p.id === passportId)?.categoryL1 ?? 'unknown',
+        quantity: payload.quantity,
+        shippingMethod,
+      });
       toast({ title: 'Listed on the marketplace', description: 'Your material is now visible to buyers.', variant: 'success' });
       void celebrate();
       router.push('/listings');
