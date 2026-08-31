@@ -51,3 +51,6 @@ packages/contracts/deployments.json
 test-results/
 playwright-report/
 assets/incoming/
+
+# Local files
+.local/

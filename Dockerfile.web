@@ -1,6 +1,6 @@
 FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat
-RUN npm install -g pnpm turbo
+RUN npm install -g pnpm@9.15.9 turbo
 
 WORKDIR /app
 COPY . .
