@@ -16,6 +16,7 @@
     "seed:workshop": "tsx scripts/seed-workshop.ts",
     "seed:products": "tsx scripts/seed-products.ts",
     "reset:marketplace": "tsx scripts/reset-marketplace.ts",
+    "rehash:passports": "tsx scripts/rehash-passports.ts",
     "sync:users": "tsx scripts/sync-users.ts",
     "studio": "drizzle-kit studio"
   },

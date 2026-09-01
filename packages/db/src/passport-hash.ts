@@ -70,7 +70,12 @@ export function buildCanonicalJsonLd(passport: MaterialPassport): string {
     remainingLifeEstimate: passport.remainingLifeEstimate ?? null,
     carbonSavingsVsNew: passport.carbonSavingsVsNew ?? null,
     hazardousSubstances: passport.hazardousSubstances,
-    status: passport.status,
+    // NOTE: `status` is deliberately NOT hashed. It is marketplace lifecycle
+    // state (active/listed/reserved/sold), not a property of the material.
+    // Including it meant makeOffer flipping a passport to 'reserved' turned a
+    // valid "Untampered" result into "Mismatch" with no tampering having
+    // occurred — which is exactly what silently broke all seven curated demo
+    // passports in June. Removed 2026-09-01; see scripts/rehash-passports.ts.
     createdAt: passport.createdAt.toISOString(),
   };
 

@@ -106,7 +106,6 @@ const EXPECTED_FIELDS = [
   'recycledContent',
   'remainingLifeEstimate',
   'serialNumber',
-  'status',
   'technicalSpecs',
 ];
 
@@ -162,13 +161,14 @@ describe('canonical passport fingerprint', () => {
     expect(computePassportHash(asNumber)).not.toBe(computePassportHash(FIXTURE));
   });
 
-  it('currently includes status — the reserved/listed transition changes the hash', () => {
-    // Documents today's behaviour rather than endorsing it: makeOffer flips a
-    // passport to 'reserved' without rehashing, which is what broke all seven
-    // curated passports in June. If status is removed from the canonical
-    // document, invert this expectation and rehash existing rows in the same
-    // change.
-    const reserved: MaterialPassport = { ...FIXTURE, status: 'reserved' };
-    expect(computePassportHash(reserved)).not.toBe(computePassportHash(FIXTURE));
+  it('excludes status, so a marketplace offer cannot forge a tamper alarm', () => {
+    // This is the regression that broke all seven curated passports in June:
+    // makeOffer flips a passport to 'reserved' without rehashing, so a
+    // legitimate purchase turned "Untampered" into "Mismatch". Lifecycle state
+    // is not a property of the material and must not be fingerprinted.
+    for (const status of ['active', 'listed', 'reserved', 'sold', 'installed'] as const) {
+      const moved: MaterialPassport = { ...FIXTURE, status };
+      expect(computePassportHash(moved)).toBe(computePassportHash(FIXTURE));
+    }
   });
 });

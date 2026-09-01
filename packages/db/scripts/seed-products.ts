@@ -31,6 +31,7 @@ import * as Minio from 'minio';
 import * as schema from '../drizzle/schema.js';
 import type { NewMaterialPassport } from '../drizzle/schema.js';
 import { computePassportHash } from '../src/passport-hash.js';
+import { resolveTarget } from './lib/guard.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -289,8 +290,12 @@ async function main() {
   const unseed = argv.includes('--unseed');
   const confirmed = argv.includes('--yes');
 
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL environment variable is required');
+  // --unseed deletes curated passports (and cascades their listings), so it
+  // must name its target. Seeding is additive and idempotent, so it does not.
+  const url = unseed
+    ? resolveTarget(argv).databaseUrl
+    : (process.env['DATABASE_URL'] ??
+       (() => { throw new Error('DATABASE_URL environment variable is required'); })());
 
   const client = postgres(url, { max: 1 });
   const db = drizzle(client, { schema });
