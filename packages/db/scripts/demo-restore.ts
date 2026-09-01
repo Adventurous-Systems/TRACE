@@ -467,13 +467,20 @@ async function main() {
       (p) => p.blockchainPassportHash !== computePassportHash(p),
     );
 
+    // These run in EVERY mode, including --verify. They were previously behind
+    // an `if (!dryRun)` guard, which meant demo:verify printed "6/7 listings"
+    // and still exited 0 — a readiness check that reports success while the
+    // demo is broken is worse than no check at all. Caught by making a real
+    // offer on staging and watching verify pass anyway.
+    if (finalListings.length !== CATALOG.length) {
+      problems.push({
+        severity: 'error',
+        message:
+          `expected ${CATALOG.length} active curated listings, found ${finalListings.length}` +
+          (dryRun ? ' — run demo:restore to fix' : ''),
+      });
+    }
     if (!dryRun) {
-      if (finalListings.length !== CATALOG.length) {
-        problems.push({
-          severity: 'error',
-          message: `expected ${CATALOG.length} active curated listings, found ${finalListings.length}`,
-        });
-      }
       for (const p of badHashes) {
         problems.push({
           severity: 'error',
