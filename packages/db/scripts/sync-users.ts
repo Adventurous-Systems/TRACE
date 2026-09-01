@@ -31,6 +31,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import * as schema from '../drizzle/schema.js';
+import { resolveTarget } from './lib/guard.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -79,8 +80,9 @@ async function main() {
   const pwIdx = argv.indexOf('--password');
   const password = pwIdx >= 0 ? argv[pwIdx + 1]! : process.env['WORKSHOP_PASSWORD'] ?? DEFAULT_PASSWORD;
 
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL environment variable is required');
+  // Fails closed unless --env matches the deployment's declared TRACE_ENV.
+  const target = resolveTarget(argv);
+  const url = target.databaseUrl;
   if (!dryRun && !confirmed) {
     console.error('Refusing to modify users without --yes. Use --dry-run to preview.');
     process.exit(1);
@@ -88,7 +90,10 @@ async function main() {
 
   const client = postgres(url, { max: 1 });
   const db = drizzle(client, { schema });
-  console.log(`\nUser sync — ${dryRun ? 'DRY-RUN (no writes)' : 'LIVE (writes enabled)'}\n`);
+  console.log(
+    `\nUser sync — ${dryRun ? 'DRY-RUN (no writes)' : 'LIVE (writes enabled)'}` +
+      `\n  target: ${target.description}\n`,
+  );
 
   try {
     // ── Removals ──────────────────────────────────────────────────────────

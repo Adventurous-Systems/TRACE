@@ -33,8 +33,11 @@ async function mintState(account: Account): Promise<void> {
   }
   if (!res) {
     throw new Error(
-      `[e2e global-setup] login failed for ${account.email} after retries (${lastError}). ` +
-        'Ensure the API is up and `seed` + `seed:workshop` have run against the target DB.',
+      `[e2e global-setup] login failed for persona "${account.role}" (${account.email}) ` +
+        `against ${API_URL} after retries (${lastError}).\n` +
+        '  This is usually a missing demo persona rather than a broken platform.\n' +
+        '  Fix with:  pnpm --filter @trace/db demo:restore -- --env <env> --yes\n' +
+        '  Locally:   pnpm --filter @trace/db seed',
     );
   }
   const { data } = (await res.json()) as { data: { token: string; user: unknown } };

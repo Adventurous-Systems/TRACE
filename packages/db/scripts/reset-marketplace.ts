@@ -25,6 +25,7 @@ import { config as loadEnv } from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import postgres from 'postgres';
+import { resolveTarget } from './lib/guard.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -44,8 +45,11 @@ async function main() {
   const dryRun = argv.includes('--dry-run');
   const confirmed = argv.includes('--yes');
 
-  const url = process.env['DATABASE_URL'];
-  if (!url) throw new Error('DATABASE_URL environment variable is required');
+  // Fails closed unless --env matches the deployment's declared TRACE_ENV.
+  // This script truncates the entire marketplace; it previously had no
+  // environment check at all, so a stale DATABASE_URL was enough to wipe prod.
+  const target = resolveTarget(argv);
+  const url = target.databaseUrl;
 
   if (!dryRun && !confirmed) {
     console.error('Refusing to delete without --yes. Re-run with --dry-run to preview, or --yes to apply.');
@@ -53,7 +57,10 @@ async function main() {
   }
 
   const sql = postgres(url, { max: 1 });
-  console.log(`\nMarketplace reset — ${dryRun ? 'DRY-RUN (no writes)' : 'LIVE (writes enabled)'}\n`);
+  console.log(
+    `\nMarketplace reset — ${dryRun ? 'DRY-RUN (no writes)' : 'LIVE (writes enabled)'}` +
+      `\n  target: ${target.description}\n`,
+  );
 
   try {
     // Show current counts. Table names come from a fixed const list (never user

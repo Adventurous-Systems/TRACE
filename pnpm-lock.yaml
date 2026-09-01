@@ -212,6 +212,10 @@ importers:
         version: 5.9.3
 
   packages/e2e:
+    dependencies:
+      '@trace/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@axe-core/playwright':
         specifier: ^4.10.1
