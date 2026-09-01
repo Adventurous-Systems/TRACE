@@ -24,8 +24,16 @@
  * report a mismatch until they are rehashed. Bump the @context version and
  * plan a backfill deliberately; do not adjust it casually.
  */
-import { keccak256 } from 'js-sha3';
+import { createRequire } from 'module';
 import type { MaterialPassport } from '../drizzle/schema.js';
+
+// js-sha3 is CommonJS and provides no named ESM export, so a bare
+// `import { keccak256 } from 'js-sha3'` throws at module load:
+//   SyntaxError: The requested module 'js-sha3' does not provide an export named 'keccak256'
+// This interop is deliberate (see commit ab6f1b3) — do not "simplify" it.
+const { keccak256 } = createRequire(import.meta.url)('js-sha3') as {
+  keccak256: (input: string) => string;
+};
 
 export function buildCanonicalJsonLd(passport: MaterialPassport): string {
   const doc = {
