@@ -67,6 +67,29 @@ interface Problem {
   message: string;
 }
 
+/**
+ * Fields the catalogue derives from `Date.now()` at import time, so their value
+ * differs on every run. Converging them would rewrite the row (and therefore
+ * the fingerprint) every single time, and demo:verify could never report a
+ * clean environment. They are seeded once and then left alone.
+ */
+const RELATIVE_DATE_FIELDS = new Set(['deconstructionDate', 'productionDate']);
+
+/**
+ * Postgres JSONB does not preserve key insertion order, so a round-tripped
+ * object compares unequal under JSON.stringify even when nothing changed.
+ * Sort keys recursively before comparing.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+  if (value instanceof Date) return JSON.stringify(value.toISOString());
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`);
+  return `{${entries.join(',')}}`;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const verifyOnly = argv.includes('--verify');
@@ -127,11 +150,17 @@ async function main() {
       };
 
       const drifted = (Object.keys(desired) as (keyof typeof desired)[]).filter((key) => {
+        if (RELATIVE_DATE_FIELDS.has(key as string)) return false;
         const want = desired[key];
         const have = (existing as Record<string, unknown>)[key as string];
         if (want instanceof Date && have instanceof Date) return want.getTime() !== have.getTime();
-        return JSON.stringify(want) !== JSON.stringify(have);
+        return stableStringify(want) !== stableStringify(have);
       });
+
+      // Never write a relative date back — see RELATIVE_DATE_FIELDS.
+      for (const field of RELATIVE_DATE_FIELDS) {
+        delete (desired as Record<string, unknown>)[field];
+      }
 
       if (drifted.length > 0 && !dryRun) {
         await db
@@ -140,14 +169,19 @@ async function main() {
           .where(eq(schema.materialPassports.id, existing.id));
       }
 
-      // Recompute the fingerprint from the converged row so verify-integrity
-      // passes. Never touch a passport that is anchored on chain.
+      // Recompute the fingerprint from the PERSISTED row, never from an
+      // in-memory merge of catalogue values. The canonical document is built
+      // with JSON.stringify, and Postgres JSONB normalises key order — so a
+      // catalogue-authored object and its stored form serialise differently
+      // and hash differently, even though they are the same data. Hashing the
+      // merge produced fingerprints that failed the very check this script
+      // makes. Never touch a passport that is anchored on chain.
       const fresh =
         drifted.length > 0 && !dryRun
           ? (await db.query.materialPassports.findFirst({
               where: eq(schema.materialPassports.id, existing.id),
             }))!
-          : { ...existing, ...(dryRun ? {} : desired) };
+          : existing;
 
       const wantHash = computePassportHash(fresh as typeof existing);
       const hashDrifted = fresh.blockchainPassportHash !== wantHash;
