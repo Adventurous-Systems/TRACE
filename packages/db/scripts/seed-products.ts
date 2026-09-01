@@ -27,10 +27,10 @@ import { readFileSync } from 'fs';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq, sql as dsql } from 'drizzle-orm';
-import { createRequire } from 'module';
 import * as Minio from 'minio';
 import * as schema from '../drizzle/schema.js';
-import type { MaterialPassport, NewMaterialPassport } from '../drizzle/schema.js';
+import type { NewMaterialPassport } from '../drizzle/schema.js';
+import { computePassportHash } from '../src/passport-hash.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -250,46 +250,11 @@ const CATALOG: Product[] = [
   },
 ];
 
-// ── Canonical fingerprint (kept byte-identical to packages/api passport-hash) ──
-function buildCanonicalJsonLd(passport: MaterialPassport): string {
-  const doc = {
-    '@context': ['https://schema.org/', 'https://w3id.org/dpp/v1', 'https://trace.construction/context/v1'],
-    '@type': 'MaterialPassport',
-    '@id': `https://trace.construction/passport/${passport.id}`,
-    id: passport.id,
-    organisationId: passport.organisationId,
-    productName: passport.productName,
-    categoryL1: passport.categoryL1,
-    categoryL2: passport.categoryL2 ?? null,
-    gtin: passport.gtin ?? null,
-    serialNumber: passport.serialNumber ?? null,
-    materialComposition: passport.materialComposition,
-    dimensions: passport.dimensions ?? null,
-    technicalSpecs: passport.technicalSpecs,
-    manufacturerName: passport.manufacturerName ?? null,
-    countryOfOrigin: passport.countryOfOrigin ?? null,
-    productionDate: (passport.productionDate as Date | null)?.toISOString() ?? null,
-    gwpTotal: passport.gwpTotal ?? null,
-    embodiedCarbon: passport.embodiedCarbon ?? null,
-    recycledContent: passport.recycledContent ?? null,
-    epdReference: passport.epdReference ?? null,
-    ceMarking: passport.ceMarking,
-    conditionGrade: passport.conditionGrade ?? null,
-    conditionNotes: passport.conditionNotes ?? null,
-    deconstructionDate: (passport.deconstructionDate as Date | null)?.toISOString() ?? null,
-    deconstructionMethod: passport.deconstructionMethod ?? null,
-    reclaimedBy: passport.reclaimedBy ?? null,
-    remainingLifeEstimate: passport.remainingLifeEstimate ?? null,
-    carbonSavingsVsNew: passport.carbonSavingsVsNew ?? null,
-    hazardousSubstances: passport.hazardousSubstances,
-    status: passport.status,
-    createdAt: passport.createdAt.toISOString(),
-  };
-  const sorted = Object.fromEntries(Object.entries(doc).sort(([a], [b]) => a.localeCompare(b)));
-  return JSON.stringify(sorted);
-}
-const { keccak256 } = createRequire(import.meta.url)('js-sha3') as { keccak256: (s: string) => string };
-const computeHash = (p: MaterialPassport): string => '0x' + keccak256(buildCanonicalJsonLd(p));
+// ── Canonical fingerprint ─────────────────────────────────────────────────────
+// Single source of truth lives in @trace/db (packages/db/src/passport-hash.ts).
+// This script used to keep its own byte-identical copy; any drift between the
+// two silently turned the demo's "Untampered" result into "Mismatch".
+const computeHash = computePassportHash;
 
 // ── MinIO ─────────────────────────────────────────────────────────────────────
 function makeMinio() {
