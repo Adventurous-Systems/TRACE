@@ -41,6 +41,19 @@ const SELLER_EMAIL = (process.env['SEED_SELLER_EMAIL'] ?? 'admin@stirlingreuse.c
 const PRODUCTS_DIR = path.resolve(PACKAGE_ROOT, 'data/products');
 const DAY = 24 * 60 * 60 * 1000;
 
+// Curated listings are demo furniture: they should still be there months later.
+// null (the default) means "never expires"; set SEED_LISTING_TTL_DAYS to a
+// positive integer to opt into an expiry.
+const listingTtlDays: number | null = (() => {
+  const raw = process.env['SEED_LISTING_TTL_DAYS'];
+  if (raw === undefined || raw.trim() === '') return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`SEED_LISTING_TTL_DAYS must be a positive number, got: ${raw}`);
+  }
+  return parsed;
+})();
+
 // ── Catalogue (the "data, in a script" the workshop can re-seed / remove) ──────
 type SeedPassport = Omit<NewMaterialPassport, 'organisationId' | 'registeredBy' | 'conditionPhotos'>;
 interface Product {
@@ -400,7 +413,12 @@ async function main() {
         quantity: product.listing.quantity,
         status: 'active',
         shippingOptions: [{ method: 'both', notes: product.listing.note ?? 'Delivery from FK7 or collection' }],
-        expiresAt: new Date(Date.now() + 90 * DAY),
+        // Curated demo listings never expire by default. A 90-day TTL used to be
+        // hardcoded here; it silently detonated on 2026-09-02 (90 days after the
+        // June seed), leaving the marketplace rendering listings that threw
+        // "Listing has expired" the moment anyone tried the make-an-offer step.
+        // Set SEED_LISTING_TTL_DAYS to opt back into an expiry for non-demo use.
+        expiresAt: listingTtlDays === null ? null : new Date(Date.now() + listingTtlDays * DAY),
       });
 
       console.log(`  ✓ seeded: ${product.passport.productName}`);
