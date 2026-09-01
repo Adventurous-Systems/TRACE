@@ -5,6 +5,7 @@ import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+import { DEMO_PERSONA_LIST } from '@trace/core/constants/demo-personas';
 import * as schema from '../drizzle/schema.js';
 
 // Load the repo-root .env for local dev. In containers the env is injected by
@@ -50,38 +51,11 @@ async function main() {
 
   // ── Users ────────────────────────────────────────────────────────────────────
 
-  const testUsers = [
-    {
-      email: 'platform@trace.eco',
-      password: 'Platform1234!',
-      name: 'Platform Admin',
-      role: 'platform_admin' as const,
-    },
-    {
-      email: 'admin@stirlingreuse.com',
-      password: 'Admin1234!',
-      name: 'Hub Admin',
-      role: 'hub_admin' as const,
-    },
-    {
-      email: 'staff@stirlingreuse.com',
-      password: 'Staff1234!',
-      name: 'Hub Staff',
-      role: 'hub_staff' as const,
-    },
-    {
-      email: 'inspector@trace.eco',
-      password: 'Inspector1234!',
-      name: 'Quality Inspector',
-      role: 'inspector' as const,
-    },
-    {
-      email: 'buyer@example.com',
-      password: 'Buyer1234!',
-      name: 'Test Buyer',
-      role: 'buyer' as const,
-    },
-  ];
+  // Personas come from the single shared definition in @trace/core, so this
+  // seeder, demo:restore and the e2e fixtures can never disagree about which
+  // accounts exist. Suppliers get their own organisation (they list stock);
+  // hub roles join the seeded hub.
+  const testUsers = DEMO_PERSONA_LIST;
 
   const createdUsers: Record<string, typeof schema.users.$inferSelect> = {};
 
@@ -91,6 +65,23 @@ async function main() {
     });
 
     if (!user) {
+      let organisationId: string | null = null;
+      if (u.organisation === 'hub') {
+        organisationId = org!.id;
+      } else if (u.organisation === 'own') {
+        const slug = `demo-${u.key.toLowerCase()}`;
+        let own = await db.query.organisations.findFirst({
+          where: eq(schema.organisations.slug, slug),
+        });
+        if (!own) {
+          [own] = await db
+            .insert(schema.organisations)
+            .values({ name: `${u.name} (Demo)`, type: 'contractor', slug, verified: true })
+            .returning();
+        }
+        organisationId = own!.id;
+      }
+
       const passwordHash = await bcrypt.hash(u.password, 10);
       [user] = await db
         .insert(schema.users)
@@ -99,7 +90,7 @@ async function main() {
           passwordHash,
           name: u.name,
           role: u.role,
-          organisationId: ['hub_admin', 'hub_staff'].includes(u.role) ? org!.id : null,
+          organisationId,
         })
         .returning();
       console.log(`  ✓ User created: ${u.email} (${u.role})`);
@@ -202,12 +193,12 @@ async function main() {
 
   await client.end();
   console.log('\nSeed complete.');
-  console.log('\nTest credentials:');
-  console.log('  Platform:    platform@trace.eco        / Platform1234!');
-  console.log('  Hub Admin:   admin@stirlingreuse.com  / Admin1234!');
-  console.log('  Hub Staff:   staff@stirlingreuse.com  / Staff1234!');
-  console.log('  Inspector:   inspector@trace.eco       / Inspector1234!');
-  console.log('  Buyer:       buyer@example.com         / Buyer1234!');
+  // Printed from the shared definition so this list cannot drift from reality
+  // (the run sheet and README each documented a different password before).
+  console.log('\nDemo personas:');
+  for (const p of DEMO_PERSONA_LIST) {
+    console.log(`  ${p.email.padEnd(28)} ${p.password.padEnd(20)} ${p.role}`);
+  }
 }
 
 main().catch((err) => {
