@@ -21,10 +21,13 @@
  *   - curated in-flight transactions cleared.
  *
  * WHAT IT DELIBERATELY DOES NOT TOUCH
- *   - users and organisations — NEVER. The supplier accounts on the demo box
- *     are real workshop attendees and sales leads (councils, universities,
- *     Zero Waste Scotland). Removing a lead is a reviewed, exported one-off,
- *     never a scripted side effect.
+ *   - it NEVER deletes a user or an organisation, and never modifies an account
+ *     that is not in DEMO_PERSONAS. The supplier accounts on the demo box are
+ *     real workshop attendees and sales leads (councils, universities, Zero
+ *     Waste Scotland). Removing a lead is a reviewed, exported one-off, never a
+ *     scripted side effect. It DOES converge the platform-owned demo personas
+ *     (creating them if absent, correcting a drifted role or password), because
+ *     the demo and its readiness check both depend on those existing.
  *   - non-curated passports. Visitors' own passports stay; only their
  *     *listings* are swept (with --sweep), which is enough to keep the
  *     marketplace presentable.
@@ -51,6 +54,8 @@ import { config as loadEnv } from 'dotenv';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { and, eq, inArray, lt, ne, notInArray, sql as dsql } from 'drizzle-orm';
+import bcrypt from 'bcrypt';
+import { DEMO_PERSONA_LIST, HUB_ORG_SLUG } from '@trace/core/constants/demo-personas';
 import * as schema from '../drizzle/schema.js';
 import { computePassportHash } from '../src/passport-hash.js';
 import { resolveTarget } from './lib/guard.js';
@@ -117,6 +122,104 @@ async function main() {
   const problems: Problem[] = [];
 
   try {
+    // ── 0. Demo personas: create if absent, correct if drifted ───────────────
+    // Scoped strictly to DEMO_PERSONAS. Any other account is left untouched.
+    console.log('Demo personas:');
+    const hubOrg = await db.query.organisations.findFirst({
+      where: eq(schema.organisations.slug, HUB_ORG_SLUG),
+    });
+    if (!hubOrg) {
+      problems.push({
+        severity: 'error',
+        message:
+          `the seeded hub organisation ("${HUB_ORG_SLUG}") is missing — run ` +
+          '`pnpm --filter @trace/db seed` first',
+      });
+    }
+
+    for (const persona of DEMO_PERSONA_LIST) {
+      const existing = await db.query.users.findFirst({
+        where: eq(schema.users.email, persona.email),
+      });
+
+      // Resolve the organisation this persona should belong to.
+      let organisationId: string | null = null;
+      if (persona.organisation === 'hub') {
+        organisationId = hubOrg?.id ?? null;
+      } else if (persona.organisation === 'own') {
+        const slug = `demo-${persona.key.toLowerCase()}`;
+        let own = await db.query.organisations.findFirst({
+          where: eq(schema.organisations.slug, slug),
+        });
+        if (!own && existing?.organisationId) {
+          // Persona already has an organisation (e.g. created by seed:workshop) — keep it.
+          organisationId = existing.organisationId;
+        } else if (!own) {
+          if (!dryRun) {
+            const [created] = await db
+              .insert(schema.organisations)
+              .values({
+                name: `${persona.name} (Demo)`,
+                type: 'contractor',
+                slug,
+                verified: true,
+              })
+              .returning();
+            own = created;
+          }
+          organisationId = own?.id ?? null;
+        } else {
+          organisationId = own.id;
+        }
+      }
+
+      if (!existing) {
+        if (!dryRun) {
+          await db.insert(schema.users).values({
+            email: persona.email,
+            passwordHash: await bcrypt.hash(persona.password, 10),
+            name: persona.name,
+            role: persona.role,
+            organisationId,
+          });
+        }
+        console.log(`  ${dryRun ? 'would create' : 'created    '} ${persona.email} (${persona.role})`);
+        continue;
+      }
+
+      // Converge rather than skip, so a drifted role is corrected. (Staging had
+      // buyer@example.com sitting as hub_staff, which would fail buyer tests.)
+      const roleDrifted = existing.role !== persona.role;
+      const orgDrifted = organisationId !== null && existing.organisationId !== organisationId;
+      const passwordOk = await bcrypt.compare(persona.password, existing.passwordHash);
+
+      if (!roleDrifted && !orgDrifted && passwordOk) {
+        console.log(`  ok          ${persona.email}`);
+        continue;
+      }
+
+      const fixes = [
+        roleDrifted ? `role ${existing.role}->${persona.role}` : null,
+        orgDrifted ? 'organisation' : null,
+        passwordOk ? null : 'password',
+      ].filter(Boolean);
+
+      if (!dryRun) {
+        await db
+          .update(schema.users)
+          .set({
+            role: persona.role,
+            ...(organisationId !== null ? { organisationId } : {}),
+            ...(passwordOk ? {} : { passwordHash: await bcrypt.hash(persona.password, 10) }),
+          })
+          .where(eq(schema.users.id, existing.id));
+      }
+      console.log(
+        `  ${dryRun ? 'would fix   ' : 'fixed       '}${persona.email}  [${fixes.join(', ')}]`,
+      );
+    }
+    console.log('');
+
     // ── 1. Curated passports: converge to the catalogue, then rehash ─────────
     const curated = await db.select().from(schema.materialPassports).where(curatedFilter);
     const byName = new Map(curated.map((p) => [p.productName, p]));
@@ -379,7 +482,25 @@ async function main() {
       }
     }
 
+    // Demo mode lives only in the deployment's .env, which is not
+    // version-controlled. If it is off without contracts deployed, every
+    // passport created during a demo stays on "Pending verification" forever
+    // and the trust moment simply never happens — so check it here rather than
+    // discovering it live.
+    const simulateAnchor = process.env['DEMO_SIMULATE_ANCHOR'] === 'true';
+    const registryAddress = process.env['MATERIAL_REGISTRY_ADDRESS'];
+    if (!simulateAnchor && !registryAddress) {
+      problems.push({
+        severity: 'error',
+        message:
+          'DEMO_SIMULATE_ANCHOR is not true and no MATERIAL_REGISTRY_ADDRESS is set — ' +
+          'passports created during a demo will never show the trust seal.\n' +
+          "       Set DEMO_SIMULATE_ANCHOR=true in this deployment's .env.",
+      });
+    }
+
     console.log('\n─────────────────────────────────────────────');
+    console.log(`Anchor mode             : ${simulateAnchor ? 'simulated' : registryAddress ? 'on-chain' : 'NONE'}`);
     console.log(`Active curated listings : ${finalListings.length}/${CATALOG.length}`);
     console.log(`Fingerprints matching   : ${finalCurated.length - badHashes.length}/${finalCurated.length}`);
 

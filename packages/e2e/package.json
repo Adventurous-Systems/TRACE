@@ -12,6 +12,9 @@
     "explore": "tsx explore/explore.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@trace/core": "workspace:*"
+  },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.49.1",
