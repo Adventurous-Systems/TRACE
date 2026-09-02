@@ -19,6 +19,11 @@ export default defineConfig({
       API_URL: 'http://localhost:3001',
       MINIO_ENDPOINT: process.env['MINIO_ENDPOINT'] ?? 'localhost',
       MINIO_PORT: process.env['MINIO_PORT'] ?? '9000',
+      // Match how the demo deployments actually run. Without this the
+      // anchor worker throws (no MATERIAL_REGISTRY_ADDRESS), passports never
+      // get a fingerprint, and anything asserting on the trust seal or
+      // verify-integrity is untestable.
+      DEMO_SIMULATE_ANCHOR: process.env['DEMO_SIMULATE_ANCHOR'] ?? 'true',
     },
   },
 });

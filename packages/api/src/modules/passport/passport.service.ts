@@ -22,31 +22,11 @@ import { ABIFunction } from '@vechain/sdk-core';
 import { anchorQueue } from '../../lib/queue.js';
 import { uploadBuffer } from '../../lib/storage.js';
 import { computePassportHash } from '../../lib/passport-hash.js';
+import { simulatePassportAnchor } from '../../lib/anchor.js';
 import { env } from '../../env.js';
 
 // Module-level singleton (avoids reconnecting on every verify call)
 const thorClient = ThorClient.at(env.VECHAIN_NODE_URL);
-
-/**
- * Demo simulation: compute a real keccak256 fingerprint and record it as a
- * "trust layer prepared" state WITHOUT submitting a VeChain transaction.
- * The convention `blockchainAnchoredAt != null && blockchainTxHash == null`
- * marks a simulated record (see getPassportCertificate / verifyPassport).
- */
-async function simulatePassportAnchor(passport: MaterialPassport): Promise<MaterialPassport> {
-  const hash = computePassportHash(passport);
-  const [updated] = await db
-    .update(materialPassports)
-    .set({
-      blockchainPassportHash: hash,
-      blockchainAnchoredAt: new Date(),
-      blockchainTxHash: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(materialPassports.id, passport.id))
-    .returning();
-  return updated ?? passport;
-}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

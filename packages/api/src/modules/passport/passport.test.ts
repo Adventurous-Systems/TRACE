@@ -300,7 +300,10 @@ describe('GET /api/v1/passports/:id/certificate', () => {
       data: { status: string; certificateHash: string | null; hub: { name: string } | null };
     }>();
     expect(body.success).toBe(true);
-    expect(['pending', 'verified', 'failed']).toContain(body.data.status);
+    // 'simulated' is the state the demo deployments run in (a real
+    // fingerprint, no chain transaction); it was missing here, so the
+    // assertion failed whenever the suite ran in demo anchor mode.
+    expect(['pending', 'verified', 'failed', 'simulated']).toContain(body.data.status);
     expect(body.data.hub?.name).toBeTruthy();
   });
 });
