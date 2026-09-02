@@ -53,7 +53,7 @@ import { fileURLToPath } from 'url';
 import { config as loadEnv } from 'dotenv';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { and, eq, inArray, lt, ne, notInArray, sql as dsql } from 'drizzle-orm';
+import { and, eq, inArray, lt, notInArray, sql as dsql } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { DEMO_PERSONA_LIST, HUB_ORG_SLUG } from '@trace/core/constants/demo-personas';
 import * as schema from '../drizzle/schema.js';
@@ -182,6 +182,14 @@ async function main() {
             role: persona.role,
             organisationId,
           });
+        } else {
+          // A missing persona is precisely what made the production smoke
+          // workflow fail for months: global-setup logs in as every persona
+          // before any test runs. verify must not call that "ready".
+          problems.push({
+            severity: 'error',
+            message: `demo persona missing: ${persona.email} (${persona.role}) — logins will fail`,
+          });
         }
         console.log(`  ${dryRun ? 'would create' : 'created    '} ${persona.email} (${persona.role})`);
         continue;
@@ -213,6 +221,11 @@ async function main() {
             ...(passwordOk ? {} : { passwordHash: await bcrypt.hash(persona.password, 10) }),
           })
           .where(eq(schema.users.id, existing.id));
+      } else {
+        problems.push({
+          severity: 'error',
+          message: `demo persona drifted: ${persona.email} [${fixes.join(', ')}]`,
+        });
       }
       console.log(
         `  ${dryRun ? 'would fix   ' : 'fixed       '}${persona.email}  [${fixes.join(', ')}]`,
@@ -225,6 +238,34 @@ async function main() {
     const byName = new Map(curated.map((p) => [p.productName, p]));
 
     console.log(`Curated catalogue (${curated.length}/${CATALOG.length} present):`);
+
+    // Rows wearing the curated tag that the catalogue does not define. They are
+    // never converged (the loop iterates CATALOG), so they drift silently and
+    // will render "Mismatch" on the public passport page.
+    const catalogueNames = new Set(CATALOG.map((c) => c.passport.productName!));
+    for (const extra of curated.filter((p) => !catalogueNames.has(p.productName))) {
+      problems.push({
+        severity: 'error',
+        message:
+          `"${extra.productName}" carries the curated tag but is not in the catalogue — ` +
+          'it is never converged and may show "Mismatch" publicly. Remove it, or add it ' +
+          'to scripts/lib/catalogue.ts.',
+      });
+    }
+
+    // Two rows with the same product name make the catalogue lookup ambiguous
+    // (the map keeps one of them), which previously surfaced as a misleading
+    // "has no listing" error against a product that clearly had one.
+    const nameCounts = new Map<string, number>();
+    for (const p of curated) nameCounts.set(p.productName, (nameCounts.get(p.productName) ?? 0) + 1);
+    for (const [name, count] of nameCounts) {
+      if (count > 1) {
+        problems.push({
+          severity: 'error',
+          message: `${count} curated passports share the name "${name}" — ambiguous; remove the duplicate`,
+        });
+      }
+    }
 
     const missing = CATALOG.filter((c) => !byName.has(c.passport.productName!));
     for (const m of missing) {
@@ -433,9 +474,12 @@ async function main() {
           and(
             eq(schema.listings.status, 'active'),
             lt(schema.listings.createdAt, cutoff),
+            // No exclusion needed when nothing is curated. The previous
+            // sentinel (ne(id, '')) crashed with `invalid input syntax for
+            // type uuid: ""`; drizzle's and() simply drops undefined.
             curatedIds.length > 0
               ? notInArray(schema.listings.passportId, curatedIds)
-              : ne(schema.listings.id, ''),
+              : undefined,
           ),
         );
 
@@ -467,19 +511,31 @@ async function main() {
       (p) => p.blockchainPassportHash !== computePassportHash(p),
     );
 
-    if (!dryRun) {
-      if (finalListings.length !== CATALOG.length) {
-        problems.push({
-          severity: 'error',
-          message: `expected ${CATALOG.length} active curated listings, found ${finalListings.length}`,
-        });
-      }
-      for (const p of badHashes) {
-        problems.push({
-          severity: 'error',
-          message: `"${p.productName}" fingerprint still mismatched after restore`,
-        });
-      }
+    // These run in EVERY mode, including --verify. They were previously behind
+    // an `if (!dryRun)` guard, which meant demo:verify printed "6/7 listings"
+    // and still exited 0 — a readiness check that reports success while the
+    // demo is broken is worse than no check at all. Caught by making a real
+    // offer on staging and watching verify pass anyway.
+    if (finalListings.length !== CATALOG.length) {
+      problems.push({
+        severity: 'error',
+        message:
+          `expected ${CATALOG.length} active curated listings, found ${finalListings.length}` +
+          (dryRun ? ' — run demo:restore to fix' : ''),
+      });
+    }
+    // Runs in every mode. Previously this was !dryRun-only, so a curated-tagged
+    // passport that is NOT in the catalogue (a duplicate, or a hand-tagged row)
+    // never reached the per-product loop and never reached here either: verify
+    // printed "Fingerprints matching : 7/8" and still said "Demo is ready".
+    // Anyone opening that passport sees "Mismatch".
+    for (const p of badHashes) {
+      problems.push({
+        severity: 'error',
+        message: dryRun
+          ? `"${p.productName}" fingerprint mismatch — verify-integrity would fail`
+          : `"${p.productName}" fingerprint still mismatched after restore`,
+      });
     }
 
     // Demo mode lives only in the deployment's .env, which is not
