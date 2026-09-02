@@ -10,6 +10,7 @@ import {
   NotFoundError,
   ForbiddenError,
 } from '@trace/core';
+import { reanchorPassport } from '../../lib/anchor.js';
 
 // ─── Submit quality report ────────────────────────────────────────────────────
 
@@ -40,12 +41,22 @@ export async function createQualityReport(
 
   if (!report) throw new Error('Failed to create quality report');
 
-  // Update passport condition grade if a grade was provided
-  if (input.overallGrade) {
-    await db
+  // Update passport condition grade if a grade was provided.
+  //
+  // `conditionGrade` is part of the canonical fingerprint document, so changing
+  // it invalidates the stored hash. Without a re-anchor the public
+  // /verify-integrity endpoint reports "Mismatch" on a passport nobody
+  // tampered with — filing an inspection during a demo used to break that
+  // product's trust moment permanently. Re-anchor, exactly as updatePassport
+  // does, so the fingerprint reflects the newly graded material.
+  if (input.overallGrade && input.overallGrade !== passport.conditionGrade) {
+    const [updated] = await db
       .update(materialPassports)
       .set({ conditionGrade: input.overallGrade, updatedAt: new Date() })
-      .where(eq(materialPassports.id, input.passportId));
+      .where(eq(materialPassports.id, input.passportId))
+      .returning();
+
+    if (updated) await reanchorPassport(updated);
   }
 
   return report;
